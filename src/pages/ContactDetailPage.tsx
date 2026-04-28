@@ -1,0 +1,262 @@
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { initials, relTime } from "@/lib/format";
+import { ArrowLeft, Pencil, Mail, Phone, Globe, MapPin, Linkedin, Twitter, Sparkles, MessageSquare, Mic, Users, Video, Phone as PhoneIcon, Building2 } from "lucide-react";
+import { EmptyState } from "@/components/EmptyState";
+import { useEffect } from "react";
+import { useAuth } from "@/lib/auth";
+
+const interactionIcon: Record<string, typeof Users> = {
+  in_person: Users,
+  call: PhoneIcon,
+  video: Video,
+  email: Mail,
+  conference: Building2,
+  other: MessageSquare,
+};
+
+export default function ContactDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const { data: contact, isLoading } = useQuery({
+    queryKey: ["contact", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contacts")
+        .select("*")
+        .eq("id", id!)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const { data: timeline } = useQuery({
+    queryKey: ["timeline", id],
+    queryFn: async () => {
+      // Pull notes + interactions linked to this contact
+      const [notesRes, icRes] = await Promise.all([
+        supabase
+          .from("notes")
+          .select("id, body_md, transcript, created_at, interaction_id")
+          .eq("contact_id", id!)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("interaction_contacts")
+          .select("interaction_id, interactions(id, title, type, occurred_at, summary, location)")
+          .eq("contact_id", id!),
+      ]);
+      if (notesRes.error) throw notesRes.error;
+      if (icRes.error) throw icRes.error;
+
+      const items: Array<{
+        kind: "note" | "interaction";
+        ts: string;
+        id: string;
+        data: any;
+      }> = [];
+      (notesRes.data ?? []).forEach((n) =>
+        items.push({ kind: "note", ts: n.created_at, id: n.id, data: n })
+      );
+      (icRes.data ?? []).forEach((row: any) => {
+        if (row.interactions) {
+          items.push({
+            kind: "interaction",
+            ts: row.interactions.occurred_at,
+            id: row.interactions.id,
+            data: row.interactions,
+          });
+        }
+      });
+      items.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+      return items;
+    },
+    enabled: !!id,
+  });
+
+  // Trigger summary refresh once when timeline changes meaningfully (debounced via tab focus is overkill — fire on mount)
+  useEffect(() => {
+    if (!id || !user) return;
+    if (!timeline || timeline.length === 0) return;
+    const t = setTimeout(() => {
+      supabase.functions.invoke("refresh-contact-summary", {
+        body: { contact_id: id },
+      }).catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, timeline?.length, user?.id]);
+
+  if (isLoading) {
+    return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
+  }
+  if (!contact) {
+    return (
+      <div className="mx-auto max-w-md p-6">
+        <Button variant="ghost" onClick={() => navigate(-1)}>← Back</Button>
+        <EmptyState title="Contact not found" />
+      </div>
+    );
+  }
+
+  const emails: string[] = Array.isArray(contact.emails) ? (contact.emails as any) : [];
+  const phones: string[] = Array.isArray(contact.phones) ? (contact.phones as any) : [];
+
+  return (
+    <div className="mx-auto w-full max-w-md">
+      {/* Header */}
+      <header
+        className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/85 px-2 py-2 backdrop-blur-md"
+        style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.25rem)" }}
+      >
+        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <Link
+          to={`/contact/${contact.id}/edit`}
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <Pencil className="h-4 w-4" /> Edit
+        </Link>
+      </header>
+
+      {/* Identity */}
+      <div className="px-5 pb-4 pt-3">
+        <Avatar className="h-20 w-20">
+          <AvatarImage src={contact.photo_url ?? undefined} />
+          <AvatarFallback className="bg-secondary text-lg">
+            {initials(contact.full_name)}
+          </AvatarFallback>
+        </Avatar>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight">{contact.full_name}</h1>
+        {(contact.title || contact.company) && (
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {[contact.title, contact.company].filter(Boolean).join(" · ")}
+          </p>
+        )}
+        {contact.location && (
+          <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="h-3 w-3" /> {contact.location}
+          </p>
+        )}
+      </div>
+
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 gap-2 px-4 pb-4 sm:grid-cols-4">
+        {emails[0] && (
+          <a href={`mailto:${emails[0]}`} className="flex flex-col items-center gap-1 rounded-md bg-card hairline border py-3 text-xs">
+            <Mail className="h-4 w-4 text-primary" /> Email
+          </a>
+        )}
+        {phones[0] && (
+          <a href={`tel:${phones[0]}`} className="flex flex-col items-center gap-1 rounded-md bg-card hairline border py-3 text-xs">
+            <Phone className="h-4 w-4 text-primary" /> Call
+          </a>
+        )}
+        {contact.linkedin_url && (
+          <a href={contact.linkedin_url} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 rounded-md bg-card hairline border py-3 text-xs">
+            <Linkedin className="h-4 w-4 text-primary" /> LinkedIn
+          </a>
+        )}
+        {contact.twitter_url && (
+          <a href={contact.twitter_url} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 rounded-md bg-card hairline border py-3 text-xs">
+            <Twitter className="h-4 w-4 text-primary" /> Twitter
+          </a>
+        )}
+        {contact.website_url && (
+          <a href={contact.website_url} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 rounded-md bg-card hairline border py-3 text-xs">
+            <Globe className="h-4 w-4 text-primary" /> Website
+          </a>
+        )}
+      </div>
+
+      {/* AI summary */}
+      <section className="px-4 pb-4">
+        <div className="rounded-lg bg-card hairline border p-4">
+          <div className="mb-1.5 inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <Sparkles className="h-3 w-3" /> What to know
+          </div>
+          {contact.notes_summary ? (
+            <p className="text-sm leading-relaxed">{contact.notes_summary}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No summary yet. Add notes or record a meeting and I'll summarize.
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* Timeline */}
+      <section className="pb-12">
+        <div className="px-4 pb-2 pt-2">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Timeline
+          </h2>
+        </div>
+        <div className="bg-card hairline border-y">
+          {!timeline || timeline.length === 0 ? (
+            <EmptyState
+              icon={<MessageSquare className="h-7 w-7" />}
+              title="No notes or interactions yet"
+              body="Use the + button to add a voice note or record a meeting."
+            />
+          ) : (
+            timeline.map((item) => {
+              if (item.kind === "interaction") {
+                const I = interactionIcon[item.data.type] ?? MessageSquare;
+                return (
+                  <div key={`i-${item.id}`} className="flex gap-3 border-b border-border px-4 py-3 last:border-0">
+                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary">
+                      <I className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="truncate text-sm font-medium">{item.data.title}</p>
+                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                          {relTime(item.ts)}
+                        </span>
+                      </div>
+                      {item.data.summary && (
+                        <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">
+                          {item.data.summary}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              const note = item.data;
+              const hasVoice = !!note.transcript;
+              return (
+                <div key={`n-${item.id}`} className="flex gap-3 border-b border-border px-4 py-3 last:border-0">
+                  <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary">
+                    {hasVoice ? <Mic className="h-3.5 w-3.5 text-primary" /> : <MessageSquare className="h-3.5 w-3.5 text-primary" />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {hasVoice ? "Voice note" : "Note"}
+                      </p>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {relTime(item.ts)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
+                      {note.body_md || note.transcript || "—"}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
