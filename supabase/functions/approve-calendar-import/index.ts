@@ -118,36 +118,23 @@ Deno.serve(async (req) => {
     const attendees: Attendee[] = Array.isArray(imp.attendees) ? imp.attendees : [];
     const linkedContactIds = new Set<string>();
 
+    // Pre-fetch all contacts once (case-insensitive email match)
+    const { data: allContacts, error: allErr } = await admin
+      .from("contacts")
+      .select("id, emails, last_contact_at")
+      .eq("user_id", userId);
+    if (allErr) throw new Error(`contacts fetch: ${allErr.message}`);
+
     for (const a of attendees) {
       if (!a.email) continue;
       const email = a.email.toLowerCase();
 
-      // Find existing contact by email (jsonb contains)
-      const { data: matches } = await admin
-        .from("contacts")
-        .select("id, emails, last_contact_at")
-        .eq("user_id", userId)
-        .contains("emails", JSON.stringify([{ email }]) as unknown as object)
-        .limit(1);
-
-      let contactId = matches?.[0]?.id;
-      let prevLast = matches?.[0]?.last_contact_at as string | null | undefined;
-
-      if (!contactId) {
-        // Try case-insensitive fallback: fetch all and filter (small N for solo user; ok)
-        const { data: all } = await admin
-          .from("contacts")
-          .select("id, emails, last_contact_at")
-          .eq("user_id", userId);
-        const found = (all ?? []).find((c) => {
-          const arr = (c.emails as Array<{ email?: string }> | null) ?? [];
-          return arr.some((e) => (e?.email ?? "").toLowerCase() === email);
-        });
-        if (found) {
-          contactId = found.id;
-          prevLast = found.last_contact_at as string | null;
-        }
-      }
+      const found = (allContacts ?? []).find((c) => {
+        const arr = (c.emails as Array<{ email?: string }> | null) ?? [];
+        return arr.some((e) => (e?.email ?? "").toLowerCase() === email);
+      });
+      let contactId = found?.id as string | undefined;
+      let prevLast = found?.last_contact_at as string | null | undefined;
 
       if (!contactId) {
         // Create stub
@@ -203,7 +190,9 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg =
+      err instanceof Error ? err.message :
+      typeof err === "object" ? JSON.stringify(err) : String(err);
     console.error("approve-calendar-import error:", msg);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
