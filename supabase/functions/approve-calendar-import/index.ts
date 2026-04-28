@@ -190,7 +190,9 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg =
+      err instanceof Error ? err.message :
+      typeof err === "object" ? JSON.stringify(err) : String(err);
     console.error("approve-calendar-import error:", msg);
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
