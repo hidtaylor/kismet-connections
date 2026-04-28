@@ -2,95 +2,107 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/*
+ * Kismet design system
+ * Calm, fast, dense. Linear meets Apple Notes.
+ * Dark default, warm light optional. All colors HSL.
+ */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Warm light mode — paper, sand, ink */
+    --background: 36 33% 97%;
+    --foreground: 220 25% 12%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 36 28% 99%;
+    --card-foreground: 220 25% 12%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 36 28% 99%;
+    --popover-foreground: 220 25% 12%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 25 90% 48%;
+    --primary-foreground: 36 33% 99%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 36 18% 92%;
+    --secondary-foreground: 220 22% 18%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 36 16% 93%;
+    --muted-foreground: 220 10% 42%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 25 90% 48%;
+    --accent-foreground: 36 33% 99%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 36 33% 99%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 152 60% 36%;
+    --warning: 38 92% 50%;
 
-    --radius: 0.5rem;
+    --border: 36 14% 88%;
+    --input: 36 14% 88%;
+    --ring: 25 90% 48%;
 
-    --sidebar-background: 0 0% 98%;
+    --radius: 0.625rem;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --surface-1: 36 22% 96%;
+    --surface-2: 36 20% 94%;
+    --surface-3: 36 18% 91%;
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 36 28% 96%;
+    --sidebar-foreground: 220 25% 12%;
+    --sidebar-primary: 25 90% 48%;
+    --sidebar-primary-foreground: 36 33% 99%;
+    --sidebar-accent: 36 18% 92%;
+    --sidebar-accent-foreground: 220 22% 18%;
+    --sidebar-border: 36 14% 88%;
+    --sidebar-ring: 25 90% 48%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    /* Dark default — deep ink, copper accent */
+    --background: 215 28% 7%;
+    --foreground: 35 20% 94%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 215 24% 9%;
+    --card-foreground: 35 20% 94%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 215 24% 10%;
+    --popover-foreground: 35 20% 94%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 28 88% 56%;
+    --primary-foreground: 215 28% 7%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 215 20% 14%;
+    --secondary-foreground: 35 20% 94%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 215 18% 13%;
+    --muted-foreground: 220 8% 62%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 28 88% 56%;
+    --accent-foreground: 215 28% 7%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 35 20% 94%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --success: 152 50% 50%;
+    --warning: 38 92% 60%;
+
+    --border: 215 18% 16%;
+    --input: 215 18% 16%;
+    --ring: 28 88% 56%;
+
+    --surface-1: 215 24% 10%;
+    --surface-2: 215 22% 12%;
+    --surface-3: 215 20% 14%;
+
+    --sidebar-background: 215 28% 7%;
+    --sidebar-foreground: 35 20% 94%;
+    --sidebar-primary: 28 88% 56%;
+    --sidebar-primary-foreground: 215 28% 7%;
+    --sidebar-accent: 215 20% 14%;
+    --sidebar-accent-foreground: 35 20% 94%;
+    --sidebar-border: 215 18% 16%;
+    --sidebar-ring: 28 88% 56%;
   }
 }
 
@@ -99,7 +111,76 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
+  html, body, #root {
+    @apply h-full;
   }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Inter",
+      "Segoe UI", Roboto, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+    /* Safe areas for iOS PWA */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Quieter selection */
+  ::selection {
+    background: hsl(var(--primary) / 0.25);
+  }
+}
+
+@layer utilities {
+  .surface-1 { background-color: hsl(var(--surface-1)); }
+  .surface-2 { background-color: hsl(var(--surface-2)); }
+  .surface-3 { background-color: hsl(var(--surface-3)); }
+
+  .text-balance { text-wrap: balance; }
+
+  /* Hairline divider that respects theme */
+  .hairline { border-color: hsl(var(--border) / 0.7); }
+
+  /* Subtle elevation without skeuomorphism */
+  .elevation-1 {
+    box-shadow: 0 1px 0 hsl(var(--border) / 0.6),
+                0 1px 2px hsl(0 0% 0% / 0.04);
+  }
+  .elevation-2 {
+    box-shadow: 0 4px 16px hsl(0 0% 0% / 0.12),
+                0 1px 0 hsl(var(--border) / 0.6);
+  }
+
+  /* Highlighted search match */
+  .match-highlight {
+    background-color: hsl(var(--primary) / 0.18);
+    color: hsl(var(--foreground));
+    border-radius: 2px;
+    padding: 0 2px;
+  }
+
+  /* For the radial FAB */
+  .fab-shadow {
+    box-shadow: 0 8px 24px hsl(var(--primary) / 0.35),
+                0 2px 6px hsl(0 0% 0% / 0.2);
+  }
+}
+
+@layer components {
+  /* Single, simple animation tokens */
+  .anim-in {
+    animation: kismet-fade-in 160ms ease-out both;
+  }
+  .anim-pop {
+    animation: kismet-pop 180ms cubic-bezier(.2,.9,.3,1.2) both;
+  }
+}
+
+@keyframes kismet-fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes kismet-pop {
+  from { opacity: 0; transform: scale(0.6); }
+  to { opacity: 1; transform: scale(1); }
 }
