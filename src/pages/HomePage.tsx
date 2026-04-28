@@ -5,7 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { ContactRow } from "@/components/ContactRow";
 import { EmptyState, SectionHeader, RowSkeleton } from "@/components/EmptyState";
-import { Search, Users, Sparkles } from "lucide-react";
+import { Search, Users, Sparkles, Calendar, Mail, ChevronRight } from "lucide-react";
+
+const CAL_SYNC_KEY = "kismet:lastCalSync";
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -51,6 +53,34 @@ export default function HomePage() {
     },
     enabled: !!user,
   });
+
+  // Pending calendar imports count
+  const { data: pendingCount, refetch: refetchPending } = useQuery({
+    queryKey: ["calendar_imports", "pending_count", user?.id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("calendar_imports")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (error) throw error;
+      return count ?? 0;
+    },
+    enabled: !!user,
+  });
+
+  // Background calendar sync on app open if stale (>1h)
+  useEffect(() => {
+    if (!user) return;
+    const last = Number(localStorage.getItem(CAL_SYNC_KEY) ?? "0");
+    if (Date.now() - last < 60 * 60 * 1000) return;
+    localStorage.setItem(CAL_SYNC_KEY, String(Date.now()));
+    supabase.functions
+      .invoke("sync-calendar")
+      .then(() => refetchPending())
+      .catch(() => {
+        // Silent: connector may not be linked yet; user will see it on the review page
+      });
+  }, [user, refetchPending]);
 
   // Submit takes us to Search prefilled
   function onSearchSubmit(e: React.FormEvent) {
