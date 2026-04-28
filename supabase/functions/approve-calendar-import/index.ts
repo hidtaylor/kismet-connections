@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
       .insert({
         user_id: userId,
         title: imp.title,
-        type: "meeting",
+        type: imp.hangout_link ? "video" : "in_person",
         occurred_at: imp.starts_at,
         ended_at: imp.ends_at,
         location: imp.location ?? imp.hangout_link ?? null,
