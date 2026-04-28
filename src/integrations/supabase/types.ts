@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      calendar_imports: {
+        Row: {
+          attendees: Json
+          calendar_id: string | null
+          created_at: string
+          description: string | null
+          ends_at: string | null
+          external_id: string
+          hangout_link: string | null
+          id: string
+          interaction_id: string | null
+          location: string | null
+          organizer_email: string | null
+          provider: string
+          raw: Json | null
+          starts_at: string
+          status: Database["public"]["Enums"]["import_status"]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attendees?: Json
+          calendar_id?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          external_id: string
+          hangout_link?: string | null
+          id?: string
+          interaction_id?: string | null
+          location?: string | null
+          organizer_email?: string | null
+          provider?: string
+          raw?: Json | null
+          starts_at: string
+          status?: Database["public"]["Enums"]["import_status"]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attendees?: Json
+          calendar_id?: string | null
+          created_at?: string
+          description?: string | null
+          ends_at?: string | null
+          external_id?: string
+          hangout_link?: string | null
+          id?: string
+          interaction_id?: string | null
+          location?: string | null
+          organizer_email?: string | null
+          provider?: string
+          raw?: Json | null
+          starts_at?: string
+          status?: Database["public"]["Enums"]["import_status"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       card_scans: {
         Row: {
           contact_id: string | null
@@ -381,6 +444,39 @@ export type Database = {
           },
         ]
       }
+      sync_state: {
+        Row: {
+          backfill_done_at: string | null
+          created_at: string
+          cursor: string | null
+          id: string
+          last_synced_at: string | null
+          provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          backfill_done_at?: string | null
+          created_at?: string
+          cursor?: string | null
+          id?: string
+          last_synced_at?: string | null
+          provider: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          backfill_done_at?: string | null
+          created_at?: string
+          cursor?: string | null
+          id?: string
+          last_synced_at?: string | null
+          provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       tags: {
         Row: {
           color: string
@@ -415,6 +511,7 @@ export type Database = {
     Enums: {
       cadence_type: "close" | "monthly" | "quarterly" | "annual" | "none"
       contact_source: "card_scan" | "calendar" | "email" | "manual"
+      import_status: "pending" | "approved" | "rejected"
       interaction_type:
         | "in_person"
         | "call"
@@ -553,6 +650,7 @@ export const Constants = {
     Enums: {
       cadence_type: ["close", "monthly", "quarterly", "annual", "none"],
       contact_source: ["card_scan", "calendar", "email", "manual"],
+      import_status: ["pending", "approved", "rejected"],
       interaction_type: [
         "in_person",
         "call",
