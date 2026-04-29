@@ -1,4 +1,6 @@
 // Aggregate notes + interactions for a contact, generate a "what to know" paragraph, save it.
+// Uses the user's auth context (RLS-enforced) — no service-role client.
+// Excludes notes flagged as 'sensitive' or 'private' from the AI corpus.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -15,25 +17,31 @@ Deno.serve(async (req) => {
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const auth = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(
+    const userClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: auth } } }
     );
-    const { data: { user } } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
-    if (!user) return json({ error: "Unauthorized" }, 401);
+    const { data: userData } = await userClient.auth.getUser();
+    if (!userData?.user) return json({ error: "unauthorized" }, 401);
 
     const { contact_id } = await req.json();
     if (!contact_id) return json({ error: "contact_id required" }, 400);
 
-    // Verify ownership
-    const { data: contact } = await supabase
-      .from("contacts").select("id, full_name, company, title").eq("id", contact_id).eq("user_id", user.id).maybeSingle();
+    // RLS will filter to the user's contact only
+    const { data: contact } = await userClient
+      .from("contacts").select("id, full_name, company, title").eq("id", contact_id).maybeSingle();
     if (!contact) return json({ error: "Not found" }, 404);
 
     const [notesRes, icRes] = await Promise.all([
-      supabase.from("notes").select("body_md, transcript, created_at").eq("contact_id", contact_id).order("created_at", { ascending: false }).limit(30),
-      supabase.from("interaction_contacts").select("interactions(title, summary, occurred_at)").eq("contact_id", contact_id).limit(30),
+      userClient.from("notes")
+        .select("body_md, transcript, created_at, sensitivity")
+        .eq("contact_id", contact_id)
+        .eq("sensitivity", "normal")
+        .order("created_at", { ascending: false }).limit(30),
+      userClient.from("interaction_contacts")
+        .select("interactions(title, summary, occurred_at)")
+        .eq("contact_id", contact_id).limit(30),
     ]);
 
     const lines: string[] = [];
@@ -47,7 +55,7 @@ Deno.serve(async (req) => {
     });
 
     if (lines.length === 0) {
-      await supabase.from("contacts").update({ notes_summary: null }).eq("id", contact_id);
+      await userClient.from("contacts").update({ notes_summary: null }).eq("id", contact_id);
       return json({ summary: null });
     }
 
@@ -73,7 +81,7 @@ Deno.serve(async (req) => {
     const summary = j?.choices?.[0]?.message?.content?.trim() ?? null;
 
     if (summary) {
-      await supabase.from("contacts").update({ notes_summary: summary }).eq("id", contact_id);
+      await userClient.from("contacts").update({ notes_summary: summary }).eq("id", contact_id);
     }
     return json({ summary });
   } catch (e) {

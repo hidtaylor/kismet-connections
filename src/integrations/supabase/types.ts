@@ -165,6 +165,7 @@ export type Database = {
           linkedin_url: string | null
           location: string | null
           notes_summary: string | null
+          organization_id: string | null
           phones: Json
           photo_url: string | null
           source: Database["public"]["Enums"]["contact_source"]
@@ -187,6 +188,7 @@ export type Database = {
           linkedin_url?: string | null
           location?: string | null
           notes_summary?: string | null
+          organization_id?: string | null
           phones?: Json
           photo_url?: string | null
           source?: Database["public"]["Enums"]["contact_source"]
@@ -209,6 +211,7 @@ export type Database = {
           linkedin_url?: string | null
           location?: string | null
           notes_summary?: string | null
+          organization_id?: string | null
           phones?: Json
           photo_url?: string | null
           source?: Database["public"]["Enums"]["contact_source"]
@@ -218,7 +221,15 @@ export type Database = {
           user_id?: string
           website_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contacts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       embeddings: {
         Row: {
@@ -246,6 +257,149 @@ export type Database = {
           id?: string
           source_id?: string
           source_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      events: {
+        Row: {
+          created_at: string
+          ends_at: string | null
+          host_org_id: string | null
+          id: string
+          kind: Database["public"]["Enums"]["event_kind"]
+          location: string | null
+          name: string
+          notes: string | null
+          starts_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          ends_at?: string | null
+          host_org_id?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["event_kind"]
+          location?: string | null
+          name: string
+          notes?: string | null
+          starts_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          ends_at?: string | null
+          host_org_id?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["event_kind"]
+          location?: string | null
+          name?: string
+          notes?: string | null
+          starts_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_host_org_id_fkey"
+            columns: ["host_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_edges: {
+        Row: {
+          confidence: Database["public"]["Enums"]["edge_confidence"]
+          created_at: string
+          evidence: Json
+          first_seen_at: string
+          id: string
+          kind: Database["public"]["Enums"]["edge_kind"]
+          last_seen_at: string
+          source_node_id: string
+          strength_override: number | null
+          strength_score: number
+          target_node_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: Database["public"]["Enums"]["edge_confidence"]
+          created_at?: string
+          evidence?: Json
+          first_seen_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["edge_kind"]
+          last_seen_at?: string
+          source_node_id: string
+          strength_override?: number | null
+          strength_score?: number
+          target_node_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: Database["public"]["Enums"]["edge_confidence"]
+          created_at?: string
+          evidence?: Json
+          first_seen_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["edge_kind"]
+          last_seen_at?: string
+          source_node_id?: string
+          strength_override?: number | null
+          strength_score?: number
+          target_node_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "graph_edges_source_node_id_fkey"
+            columns: ["source_node_id"]
+            isOneToOne: false
+            referencedRelation: "graph_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "graph_edges_target_node_id_fkey"
+            columns: ["target_node_id"]
+            isOneToOne: false
+            referencedRelation: "graph_nodes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      graph_nodes: {
+        Row: {
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["node_kind"]
+          label: string
+          ref_id: string
+          ref_table: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["node_kind"]
+          label: string
+          ref_id: string
+          ref_table: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["node_kind"]
+          label?: string
+          ref_id?: string
+          ref_table?: string
           user_id?: string
         }
         Relationships: []
@@ -328,30 +482,45 @@ export type Database = {
       notes: {
         Row: {
           body_md: string
+          confirmed_at: string | null
           contact_id: string | null
           created_at: string
+          expires_at: string | null
           id: string
           interaction_id: string | null
+          provenance: Database["public"]["Enums"]["note_provenance"]
+          sensitivity: Database["public"]["Enums"]["note_sensitivity"]
+          source_interaction_id: string | null
           transcript: string | null
           user_id: string
           voice_url: string | null
         }
         Insert: {
           body_md?: string
+          confirmed_at?: string | null
           contact_id?: string | null
           created_at?: string
+          expires_at?: string | null
           id?: string
           interaction_id?: string | null
+          provenance?: Database["public"]["Enums"]["note_provenance"]
+          sensitivity?: Database["public"]["Enums"]["note_sensitivity"]
+          source_interaction_id?: string | null
           transcript?: string | null
           user_id: string
           voice_url?: string | null
         }
         Update: {
           body_md?: string
+          confirmed_at?: string | null
           contact_id?: string | null
           created_at?: string
+          expires_at?: string | null
           id?: string
           interaction_id?: string | null
+          provenance?: Database["public"]["Enums"]["note_provenance"]
+          sensitivity?: Database["public"]["Enums"]["note_sensitivity"]
+          source_interaction_id?: string | null
           transcript?: string | null
           user_id?: string
           voice_url?: string | null
@@ -369,6 +538,60 @@ export type Database = {
             columns: ["interaction_id"]
             isOneToOne: false
             referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_source_interaction_id_fkey"
+            columns: ["source_interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["org_kind"]
+          logo_url: string | null
+          name: string
+          notes: string | null
+          parent_org_id: string | null
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["org_kind"]
+          logo_url?: string | null
+          name: string
+          notes?: string | null
+          parent_org_id?: string | null
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["org_kind"]
+          logo_url?: string | null
+          name?: string
+          notes?: string | null
+          parent_org_id?: string | null
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizations_parent_org_id_fkey"
+            columns: ["parent_org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -405,9 +628,12 @@ export type Database = {
           consent_disclosed: boolean
           created_at: string
           duration_seconds: number | null
+          external_url: string | null
           id: string
           interaction_id: string | null
-          storage_path: string
+          source_external_id: string | null
+          source_provider: string | null
+          storage_path: string | null
           transcript_status: Database["public"]["Enums"]["transcript_status"]
           transcript_text: string | null
           user_id: string
@@ -416,9 +642,12 @@ export type Database = {
           consent_disclosed?: boolean
           created_at?: string
           duration_seconds?: number | null
+          external_url?: string | null
           id?: string
           interaction_id?: string | null
-          storage_path: string
+          source_external_id?: string | null
+          source_provider?: string | null
+          storage_path?: string | null
           transcript_status?: Database["public"]["Enums"]["transcript_status"]
           transcript_text?: string | null
           user_id: string
@@ -427,9 +656,12 @@ export type Database = {
           consent_disclosed?: boolean
           created_at?: string
           duration_seconds?: number | null
+          external_url?: string | null
           id?: string
           interaction_id?: string | null
-          storage_path?: string
+          source_external_id?: string | null
+          source_provider?: string | null
+          storage_path?: string | null
           transcript_status?: Database["public"]["Enums"]["transcript_status"]
           transcript_text?: string | null
           user_id?: string
@@ -438,6 +670,63 @@ export type Database = {
           {
             foreignKeyName: "recordings_interaction_id_fkey"
             columns: ["interaction_id"]
+            isOneToOne: false
+            referencedRelation: "interactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suggested_memories: {
+        Row: {
+          body_md: string
+          contact_id: string | null
+          created_at: string
+          decided_at: string | null
+          id: string
+          reasoning: string | null
+          source_interaction_id: string | null
+          status: Database["public"]["Enums"]["suggested_memory_status"]
+          suggested_provenance: Database["public"]["Enums"]["note_provenance"]
+          suggested_sensitivity: Database["public"]["Enums"]["note_sensitivity"]
+          user_id: string
+        }
+        Insert: {
+          body_md: string
+          contact_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          reasoning?: string | null
+          source_interaction_id?: string | null
+          status?: Database["public"]["Enums"]["suggested_memory_status"]
+          suggested_provenance?: Database["public"]["Enums"]["note_provenance"]
+          suggested_sensitivity?: Database["public"]["Enums"]["note_sensitivity"]
+          user_id: string
+        }
+        Update: {
+          body_md?: string
+          contact_id?: string | null
+          created_at?: string
+          decided_at?: string | null
+          id?: string
+          reasoning?: string | null
+          source_interaction_id?: string | null
+          status?: Database["public"]["Enums"]["suggested_memory_status"]
+          suggested_provenance?: Database["public"]["Enums"]["note_provenance"]
+          suggested_sensitivity?: Database["public"]["Enums"]["note_sensitivity"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suggested_memories_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suggested_memories_source_interaction_id_fkey"
+            columns: ["source_interaction_id"]
             isOneToOne: false
             referencedRelation: "interactions"
             referencedColumns: ["id"]
@@ -501,6 +790,33 @@ export type Database = {
         }
         Relationships: []
       }
+      topics: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          slug: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          slug: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -511,6 +827,40 @@ export type Database = {
     Enums: {
       cadence_type: "close" | "monthly" | "quarterly" | "annual" | "none"
       contact_source: "card_scan" | "calendar" | "email" | "manual"
+      edge_confidence: "confirmed" | "inferred" | "suggested"
+      edge_kind:
+        | "knows"
+        | "worked_with"
+        | "introduced_by"
+        | "family"
+        | "mentor"
+        | "mentee"
+        | "works_at"
+        | "formerly_at"
+        | "advisor"
+        | "board"
+        | "founder"
+        | "client"
+        | "attended"
+        | "spoke_at"
+        | "hosted"
+        | "expert_in"
+        | "interested_in"
+        | "parent_of"
+        | "subsidiary_of"
+        | "partner_of"
+        | "competitor_of"
+        | "sponsored"
+        | "co_attended"
+        | "met_with"
+        | "co_thread"
+      event_kind:
+        | "conference"
+        | "panel"
+        | "dinner"
+        | "internal"
+        | "webinar"
+        | "other"
       import_status: "pending" | "approved" | "rejected"
       interaction_type:
         | "in_person"
@@ -519,7 +869,24 @@ export type Database = {
         | "email"
         | "conference"
         | "other"
+      node_kind: "person" | "org" | "event" | "topic"
+      note_provenance:
+        | "fact"
+        | "user_memory"
+        | "ai_summary"
+        | "ai_inference"
+        | "recommendation"
+      note_sensitivity: "normal" | "sensitive" | "private"
+      org_kind:
+        | "brokerage"
+        | "association"
+        | "vendor"
+        | "portal"
+        | "mls"
+        | "startup"
+        | "other"
       scan_status: "pending" | "parsed" | "confirmed" | "discarded"
+      suggested_memory_status: "pending" | "accepted" | "rejected"
       transcript_status: "pending" | "processing" | "done" | "failed"
     }
     CompositeTypes: {
@@ -650,6 +1017,42 @@ export const Constants = {
     Enums: {
       cadence_type: ["close", "monthly", "quarterly", "annual", "none"],
       contact_source: ["card_scan", "calendar", "email", "manual"],
+      edge_confidence: ["confirmed", "inferred", "suggested"],
+      edge_kind: [
+        "knows",
+        "worked_with",
+        "introduced_by",
+        "family",
+        "mentor",
+        "mentee",
+        "works_at",
+        "formerly_at",
+        "advisor",
+        "board",
+        "founder",
+        "client",
+        "attended",
+        "spoke_at",
+        "hosted",
+        "expert_in",
+        "interested_in",
+        "parent_of",
+        "subsidiary_of",
+        "partner_of",
+        "competitor_of",
+        "sponsored",
+        "co_attended",
+        "met_with",
+        "co_thread",
+      ],
+      event_kind: [
+        "conference",
+        "panel",
+        "dinner",
+        "internal",
+        "webinar",
+        "other",
+      ],
       import_status: ["pending", "approved", "rejected"],
       interaction_type: [
         "in_person",
@@ -659,7 +1062,26 @@ export const Constants = {
         "conference",
         "other",
       ],
+      node_kind: ["person", "org", "event", "topic"],
+      note_provenance: [
+        "fact",
+        "user_memory",
+        "ai_summary",
+        "ai_inference",
+        "recommendation",
+      ],
+      note_sensitivity: ["normal", "sensitive", "private"],
+      org_kind: [
+        "brokerage",
+        "association",
+        "vendor",
+        "portal",
+        "mls",
+        "startup",
+        "other",
+      ],
       scan_status: ["pending", "parsed", "confirmed", "discarded"],
+      suggested_memory_status: ["pending", "accepted", "rejected"],
       transcript_status: ["pending", "processing", "done", "failed"],
     },
   },
