@@ -1,24 +1,40 @@
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Building2, Plus, ChevronRight } from "lucide-react";
+import { ArrowLeft, Building2, Plus, ChevronRight, Search } from "lucide-react";
 import { EmptyState, RowSkeleton } from "@/components/EmptyState";
 
 export default function OrganizationsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 200);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const { data: orgs, isLoading } = useQuery({
-    queryKey: ["organizations", user?.id],
+    queryKey: ["organizations", user?.id, debounced],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from("organizations")
-        .select("id, name, kind, website")
-        .order("name", { ascending: true });
+        .select("id, name, kind, website, contacts!contacts_organization_id_fkey(count)");
+      if (debounced) q = q.ilike("name", `%${debounced}%`);
+      const { data, error } = await q;
       if (error) throw error;
-      return data ?? [];
+      const rows = (data ?? []).map((o: any) => ({
+        ...o,
+        contact_count: o.contacts?.[0]?.count ?? 0,
+      }));
+      rows.sort((a, b) =>
+        b.contact_count - a.contact_count || a.name.localeCompare(b.name),
+      );
+      return rows;
     },
     enabled: !!user,
   });
@@ -42,6 +58,19 @@ export default function OrganizationsPage() {
         </Button>
       </header>
 
+      <div className="px-3 py-3">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search organizations…"
+            className="h-10 w-full rounded-md border border-input bg-card pl-9 pr-3 text-sm"
+          />
+        </div>
+      </div>
+
       <div className="bg-card hairline border-y">
         {isLoading ? (
           <>
@@ -50,8 +79,12 @@ export default function OrganizationsPage() {
         ) : !orgs || orgs.length === 0 ? (
           <EmptyState
             icon={<Building2 className="h-7 w-7" />}
-            title="No organizations yet"
-            body="Add brokerages, associations, MLS, vendors, or portals to group your contacts."
+            title={debounced ? "No matches" : "No organizations yet"}
+            body={
+              debounced
+                ? "Try a different name."
+                : "Add brokerages, associations, MLS, vendors, or portals to group your contacts."
+            }
           />
         ) : (
           orgs.map((o) => (
@@ -65,7 +98,9 @@ export default function OrganizationsPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{o.name}</p>
-                <p className="truncate text-xs text-muted-foreground">{o.kind}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {o.kind} · {o.contact_count} {o.contact_count === 1 ? "contact" : "contacts"}
+                </p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </Link>
