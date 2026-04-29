@@ -47,6 +47,8 @@ export default {
         },
         success: "hsl(var(--success))",
         warning: "hsl(var(--warning))",
+        "signal-pink": "hsl(var(--signal-pink))",
+        "memory-blue": "hsl(var(--memory-blue))",
         surface: {
           1: "hsl(var(--surface-1))",
           2: "hsl(var(--surface-2))",
@@ -70,8 +72,8 @@ export default {
       },
       fontFamily: {
         sans: [
-          "ui-sans-serif", "system-ui", "-apple-system", "SF Pro Text",
-          "Inter", "Segoe UI", "Roboto", "sans-serif",
+          "Inter", "ui-sans-serif", "system-ui", "-apple-system", "SF Pro Text",
+          "Segoe UI", "Roboto", "sans-serif",
         ],
         mono: [
           "ui-monospace", "SF Mono", "Menlo", "Monaco", "Consolas", "monospace",

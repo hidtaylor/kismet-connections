@@ -140,7 +140,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "Inter",
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "SF Pro Text",
       "Segoe UI", Roboto, sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
     /* Safe areas for iOS PWA */
@@ -186,6 +186,17 @@
   .fab-shadow {
     box-shadow: 0 8px 24px hsl(var(--primary) / 0.35),
                 0 2px 6px hsl(0 0% 0% / 0.2);
+  }
+
+  /* Signature Kismet gradient */
+  .bg-gradient-kismet {
+    background-image: var(--gradient-kismet);
+  }
+  .text-gradient-kismet {
+    background-image: var(--gradient-kismet);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
 }
 

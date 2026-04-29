@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { KismetMark } from "@/components/KismetMark";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
@@ -41,16 +42,10 @@ export default function AuthPage() {
     <div className="flex min-h-screen flex-col items-center justify-center px-6">
       <div className="w-full max-w-sm">
         <div className="mb-10 flex flex-col items-center gap-3">
-          <img
-            src="/icon-512.png"
-            alt="Kismet"
-            width={56}
-            height={56}
-            className="rounded-2xl"
-          />
+          <KismetMark size={56} />
           <h1 className="text-2xl font-semibold tracking-tight">Kismet</h1>
           <p className="text-sm text-muted-foreground text-center text-balance">
-            Relationship memory for the people you meet.
+            Remember the people who matter, when it matters.
           </p>
         </div>
 
