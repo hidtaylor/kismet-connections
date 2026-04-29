@@ -1,5 +1,6 @@
 // Extract candidate memories from a transcript and queue them in suggested_memories.
 // Called after a meeting interaction has been saved + contacts linked.
+// The transcript is fetched server-side from the recordings table — never trusted from the request.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -24,16 +25,27 @@ Deno.serve(async (req) => {
     if (!userData?.user) return json({ error: "unauthorized" }, 401);
     const userId = userData.user.id;
 
-    const { interaction_id, transcript } = await req.json();
-    if (!interaction_id || typeof transcript !== "string") {
-      return json({ error: "interaction_id and transcript required" }, 400);
+    const body = await req.json().catch(() => ({}));
+    const interaction_id = body?.interaction_id;
+    if (!interaction_id || typeof interaction_id !== "string") {
+      return json({ error: "interaction_id required" }, 400);
     }
-    if (transcript.length < 200) return json({ ok: true, queued: 0 });
 
     // Verify ownership of the interaction via RLS
     const { data: ix } = await userClient
       .from("interactions").select("id").eq("id", interaction_id).maybeSingle();
     if (!ix) return json({ error: "not_found" }, 404);
+
+    // Fetch transcript server-side from the most recent recording for this interaction
+    const { data: rec } = await userClient
+      .from("recordings")
+      .select("transcript_text")
+      .eq("interaction_id", interaction_id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const transcript = rec?.transcript_text ?? "";
+    if (transcript.length < 200) return json({ ok: true, queued: 0 });
 
     const { data: ics } = await userClient
       .from("interaction_contacts")
