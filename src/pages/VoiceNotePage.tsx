@@ -66,9 +66,45 @@ export default function VoiceNotePage() {
     if (!user || !storagePath) return;
     setLinking(true);
     const { data: signed } = await supabase.storage.from("recordings").createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+
+    // If attached to a contact and there's a transcript worth analyzing, create a lightweight
+    // interaction so suggested-memories has something to attach to.
+    let interactionId: string | null = null;
+    if (contactId && transcript && transcript.length > 200) {
+      const { data: ix, error: ixErr } = await supabase
+        .from("interactions")
+        .insert({
+          user_id: user.id,
+          title: "Voice note",
+          type: "other",
+          occurred_at: new Date().toISOString(),
+        })
+        .select("id").single();
+      if (ixErr) { setLinking(false); toast.error(ixErr.message); return; }
+      interactionId = ix.id;
+
+      await supabase.from("interaction_contacts").insert({
+        user_id: user.id,
+        interaction_id: interactionId,
+        contact_id: contactId,
+      });
+
+      // Persist transcript on a recordings row so extract-memories can read it server-side
+      await supabase.from("recordings").insert({
+        user_id: user.id,
+        interaction_id: interactionId,
+        storage_path: storagePath,
+        duration_seconds: r.duration,
+        transcript_text: transcript,
+        transcript_status: "done",
+        consent_disclosed: true,
+      });
+    }
+
     const { error } = await supabase.from("notes").insert({
       user_id: user.id,
       contact_id: contactId,
+      interaction_id: interactionId,
       body_md: "",
       voice_url: signed?.signedUrl ?? null,
       transcript,
@@ -80,6 +116,13 @@ export default function VoiceNotePage() {
 
     if (contactId) {
       await supabase.from("contacts").update({ last_contact_at: new Date().toISOString() }).eq("id", contactId);
+    }
+
+    // Fire-and-forget memory extraction (transcript fetched server-side from recordings)
+    if (interactionId) {
+      supabase.functions.invoke("extract-memories", {
+        body: { interaction_id: interactionId },
+      }).catch(() => {});
     }
 
     setLinking(false);
