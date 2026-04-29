@@ -146,21 +146,16 @@ export default function SettingsPage() {
         {/* Integrations */}
         <Group title="Integrations">
           <FirefliesCard userId={user?.id} />
-          <p className="pt-2 text-xs text-muted-foreground">More coming soon — phase 2.</p>
-          <div className="space-y-1.5 opacity-50 pointer-events-none select-none">
-            {[
-              { name: "Google Calendar", desc: "Auto-create interactions from events" },
-              { name: "Zoom", desc: "Pull recordings + participants" },
-              { name: "Gmail", desc: "Surface contact email history" },
-            ].map((p) => (
-              <div key={p.name} className="flex items-center justify-between rounded-md bg-card hairline border px-3 py-2.5">
-                <div>
-                  <p className="text-sm font-medium">{p.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{p.desc}</p>
-                </div>
-                <Cable className="h-4 w-4 text-muted-foreground" />
+          <CalendarCard userId={user?.id} />
+          <GmailCard />
+          <div className="opacity-50 pointer-events-none select-none">
+            <div className="flex items-center justify-between rounded-md bg-card hairline border px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium">Zoom</p>
+                <p className="text-[11px] text-muted-foreground">Pull recordings + participants — coming soon</p>
               </div>
-            ))}
+              <Cable className="h-4 w-4 text-muted-foreground" />
+            </div>
           </div>
         </Group>
 
