@@ -111,10 +111,10 @@ export default function RecordMeetingPage() {
       );
     }
 
-    // 4. Extract candidate memories (fire-and-forget)
+    // 4. Extract candidate memories (fire-and-forget) — function fetches transcript server-side
     if (transcript && transcript.length > 200 && selectedContacts.length > 0) {
       supabase.functions.invoke("extract-memories", {
-        body: { interaction_id: interaction!.id, transcript },
+        body: { interaction_id: interaction!.id },
       }).catch(() => {});
     }
 

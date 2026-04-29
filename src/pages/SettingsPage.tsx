@@ -146,21 +146,16 @@ export default function SettingsPage() {
         {/* Integrations */}
         <Group title="Integrations">
           <FirefliesCard userId={user?.id} />
-          <p className="pt-2 text-xs text-muted-foreground">More coming soon — phase 2.</p>
-          <div className="space-y-1.5 opacity-50 pointer-events-none select-none">
-            {[
-              { name: "Google Calendar", desc: "Auto-create interactions from events" },
-              { name: "Zoom", desc: "Pull recordings + participants" },
-              { name: "Gmail", desc: "Surface contact email history" },
-            ].map((p) => (
-              <div key={p.name} className="flex items-center justify-between rounded-md bg-card hairline border px-3 py-2.5">
-                <div>
-                  <p className="text-sm font-medium">{p.name}</p>
-                  <p className="text-[11px] text-muted-foreground">{p.desc}</p>
-                </div>
-                <Cable className="h-4 w-4 text-muted-foreground" />
+          <CalendarCard userId={user?.id} />
+          <GmailCard />
+          <div className="opacity-50 pointer-events-none select-none">
+            <div className="flex items-center justify-between rounded-md bg-card hairline border px-3 py-2.5">
+              <div>
+                <p className="text-sm font-medium">Zoom</p>
+                <p className="text-[11px] text-muted-foreground">Pull recordings + participants — coming soon</p>
               </div>
-            ))}
+              <Cable className="h-4 w-4 text-muted-foreground" />
+            </div>
           </div>
         </Group>
 
@@ -246,3 +241,67 @@ function FirefliesCard({ userId }: { userId?: string }) {
     </div>
   );
 }
+
+function CalendarCard({ userId }: { userId?: string }) {
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("sync_state").select("last_synced_at")
+      .eq("user_id", userId).eq("provider", "google_calendar").maybeSingle()
+      .then(({ data }) => setLastSynced(data?.last_synced_at ?? null));
+  }, [userId, syncing]);
+
+  async function sync() {
+    setSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-calendar", { body: {} });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const events = data?.synced ?? data?.events ?? 0;
+      const staged = data?.staged ?? data?.pending ?? 0;
+      toast.success(`Synced ${events} events, ${staged} staged for review.`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <div className="rounded-md bg-card hairline border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Google Calendar</p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {lastSynced ? `Last synced ${new Date(lastSynced).toLocaleString()}` : "Not synced yet"}
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={sync} disabled={syncing}>
+          {syncing ? "Syncing…" : "Sync now"}
+        </Button>
+      </div>
+      <Link to="/import/calendar" className="mt-2 inline-block text-[11px] text-primary hover:underline">
+        Review staged events →
+      </Link>
+    </div>
+  );
+}
+
+function GmailCard() {
+  return (
+    <div className="rounded-md bg-card hairline border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Gmail</p>
+          <p className="truncate text-[11px] text-muted-foreground">Surface contact email history</p>
+        </div>
+        <Button size="sm" variant="outline" asChild>
+          <Link to="/import/gmail">Browse recent inbox</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
