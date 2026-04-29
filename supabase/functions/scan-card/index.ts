@@ -1,5 +1,5 @@
 // Scan a business card image with Lovable AI (Gemini Flash, vision-capable).
-// Returns structured JSON parsed from the card.
+// Downloads image from user's storage path (no external URL accepted).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -15,16 +15,38 @@ Deno.serve(async (req) => {
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const auth = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-      { global: { headers: { Authorization: auth } } }
-    );
-    const { data: { user } } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const userClient = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: auth } },
+    });
+    const { data: userData } = await userClient.auth.getUser();
+    const user = userData?.user;
     if (!user) return json({ error: "Unauthorized" }, 401);
 
-    const { image_url, storage_path } = await req.json();
-    if (!image_url) return json({ error: "image_url required" }, 400);
+    const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+    const { storage_path } = await req.json();
+    if (!storage_path || typeof storage_path !== "string") {
+      return json({ error: "storage_path required" }, 400);
+    }
+    if (!storage_path.startsWith(`${user.id}/`)) {
+      return json({ error: "forbidden path" }, 403);
+    }
+
+    // Download image from storage
+    const dl = await admin.storage.from("card-images").download(storage_path);
+    if (dl.error) throw dl.error;
+    const buf = await dl.data.arrayBuffer();
+    // Chunked base64 to avoid call-stack overflow on large images
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+    }
+    const b64 = btoa(bin);
+    const mime = dl.data.type || "image/jpeg";
+    const dataUrl = `data:${mime};base64,${b64}`;
 
     const prompt = `You are a precise OCR + parser. Extract structured contact info from this business card image.
 Return ONLY a JSON object matching this exact schema (no prose, no markdown):
@@ -52,7 +74,7 @@ Use empty arrays for none, null for missing single fields. raw_text must contain
           role: "user",
           content: [
             { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: image_url } },
+            { type: "image_url", image_url: { url: dataUrl } },
           ],
         }],
         response_format: { type: "json_object" },
@@ -72,16 +94,14 @@ Use empty arrays for none, null for missing single fields. raw_text must contain
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { parsed = { raw_text: content }; }
 
-    // Persist scan record
-    if (storage_path) {
-      await supabase.from("card_scans").insert({
-        user_id: user.id,
-        image_url: storage_path,
-        ocr_json: { raw_text: parsed.raw_text ?? "" },
-        parsed_json: parsed,
-        status: "parsed",
-      });
-    }
+    // Persist scan record (image_url column stores the storage path)
+    await userClient.from("card_scans").insert({
+      user_id: user.id,
+      image_url: storage_path,
+      ocr_json: { raw_text: parsed.raw_text ?? "" },
+      parsed_json: parsed,
+      status: "parsed",
+    });
 
     return json({ parsed });
   } catch (e) {

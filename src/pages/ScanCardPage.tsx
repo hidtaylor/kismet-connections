@@ -91,13 +91,9 @@ export default function ScanCardPage() {
       });
       if (upload.error) throw upload.error;
 
-      // 2. Get signed URL for AI to fetch
-      const { data: signed } = await supabase.storage.from("card-images").createSignedUrl(path, 60 * 5);
-      if (!signed?.signedUrl) throw new Error("Could not sign image");
-
-      // 3. Call edge function
+      // 2. Call edge function (it downloads via service-role, no public URL needed)
       const { data, error } = await supabase.functions.invoke("scan-card", {
-        body: { image_url: signed.signedUrl, storage_path: path },
+        body: { storage_path: path },
       });
       if (error) throw error;
       const parsed: Parsed = data?.parsed ?? {};
