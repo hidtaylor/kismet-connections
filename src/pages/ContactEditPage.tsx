@@ -12,12 +12,14 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
+import { OrgTypeahead } from "@/components/OrgTypeahead";
 
 type Form = {
   full_name: string;
   first_name: string;
   last_name: string;
   company: string;
+  organization_id: string | null;
   title: string;
   emails: string[];
   phones: string[];
@@ -34,6 +36,7 @@ const empty: Form = {
   first_name: "",
   last_name: "",
   company: "",
+  organization_id: null,
   title: "",
   emails: [],
   phones: [],
