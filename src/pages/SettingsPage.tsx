@@ -128,13 +128,12 @@ export default function SettingsPage() {
           </div>
         </Group>
 
-        {/* Integrations (greyed out for v1) */}
+        {/* Integrations */}
         <Group title="Integrations">
-          <p className="text-xs text-muted-foreground">Coming soon — phase 2.</p>
+          <FirefliesCard userId={user?.id} />
+          <p className="pt-2 text-xs text-muted-foreground">More coming soon — phase 2.</p>
           <div className="space-y-1.5 opacity-50 pointer-events-none select-none">
-            {/* TODO(phase-2): wire up OAuth + per-provider sync edge functions */}
             {[
-              { name: "Fireflies", desc: "Auto-import meeting transcripts" },
               { name: "Google Calendar", desc: "Auto-create interactions from events" },
               { name: "Zoom", desc: "Pull recordings + participants" },
               { name: "Gmail", desc: "Surface contact email history" },
