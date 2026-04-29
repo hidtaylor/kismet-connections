@@ -142,7 +142,7 @@ export default function ContactEditPage() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <h1 className="text-sm font-medium">{isNew ? "New contact" : "Edit contact"}</h1>
-        <Button size="sm" onClick={save} disabled={saving}>
+        <Button size="sm" onClick={save} disabled={saving} className="bg-gradient-kismet text-primary-foreground hover:opacity-90">
           {saving ? "Saving…" : "Save"}
         </Button>
       </header>

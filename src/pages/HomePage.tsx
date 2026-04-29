@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { ContactRow } from "@/components/ContactRow";
 import { EmptyState, SectionHeader, RowSkeleton } from "@/components/EmptyState";
 import { Search, Users, Sparkles, Calendar, Mail, ChevronRight } from "lucide-react";
+import { KismetMark } from "@/components/KismetMark";
 
 const CAL_SYNC_KEY = "kismet:lastCalSync";
 
@@ -97,7 +98,10 @@ export default function HomePage() {
       >
         <div className="px-4 pb-3 pt-3">
           <div className="mb-3 flex items-center justify-between">
-            <h1 className="text-lg font-semibold tracking-tight">Kismet</h1>
+            <div className="flex items-center gap-2">
+              <KismetMark size={22} />
+              <h1 className="text-lg font-semibold tracking-tight text-gradient-kismet">Kismet</h1>
+            </div>
             <span className="text-[11px] text-muted-foreground">
               {recents?.length ?? 0} contacts
             </span>
@@ -194,7 +198,7 @@ export default function HomePage() {
               action={
                 <Link
                   to="/contact/new"
-                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-gradient-kismet px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm"
                 >
                   <Sparkles className="h-3.5 w-3.5" /> Add your first contact
                 </Link>

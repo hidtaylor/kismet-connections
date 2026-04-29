@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { getTheme, setTheme as applyTheme } from "@/lib/theme";
 import { Cable, LogOut, Sun, Moon, Tag, Plus, X } from "lucide-react";
+import { KismetMark } from "@/components/KismetMark";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -62,7 +63,10 @@ export default function SettingsPage() {
         className="sticky top-0 z-30 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-md"
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)" }}
       >
-        <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
+        <div className="flex items-center gap-2">
+          <KismetMark size={20} />
+          <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
+        </div>
       </header>
 
       <div className="space-y-6 px-4 py-5">
@@ -146,7 +150,7 @@ export default function SettingsPage() {
           </div>
         </Group>
 
-        <Button onClick={saveProfile} className="w-full">Save settings</Button>
+        <Button onClick={saveProfile} className="w-full bg-gradient-kismet text-primary-foreground hover:opacity-90">Save settings</Button>
 
         <Button variant="ghost" onClick={signOut} className="w-full text-destructive hover:text-destructive">
           <LogOut className="mr-2 h-4 w-4" /> Sign out

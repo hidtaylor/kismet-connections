@@ -43,7 +43,7 @@ export default function AuthPage() {
       <div className="w-full max-w-sm">
         <div className="mb-10 flex flex-col items-center gap-3">
           <KismetMark size={56} />
-          <h1 className="text-2xl font-semibold tracking-tight">Kismet</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-gradient-kismet">Kismet</h1>
           <p className="text-sm text-muted-foreground text-center text-balance">
             Remember the people who matter, when it matters.
           </p>
@@ -75,7 +75,7 @@ export default function AuthPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="h-12 text-base"
             />
-            <Button type="submit" className="h-12 w-full text-base" disabled={sending}>
+            <Button type="submit" className="h-12 w-full text-base bg-gradient-kismet text-primary-foreground hover:opacity-90" disabled={sending}>
               {sending ? "Sending…" : "Send magic link"}
             </Button>
             <p className="pt-2 text-center text-xs text-muted-foreground">

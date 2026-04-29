@@ -120,7 +120,7 @@ export function AppLayout() {
         {/* Main FAB */}
         <button
           onClick={() => setFabOpen((v) => !v)}
-          className="absolute flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground fab-shadow transition-transform"
+          className="absolute flex h-14 w-14 items-center justify-center rounded-full bg-gradient-kismet text-primary-foreground fab-shadow transition-transform"
           style={{
             right: "1.5rem",
             bottom: `calc(env(safe-area-inset-bottom) + 5rem)`,
