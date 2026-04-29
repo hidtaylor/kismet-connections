@@ -307,3 +307,129 @@ function GmailCard() {
   );
 }
 
+type EdgeRow = {
+  strength_score: number;
+  kind: string;
+  source: { label: string; ref_id: string } | null;
+  target: { label: string; ref_id: string } | null;
+};
+
+function GraphStrengthCard({ userId }: { userId?: string }) {
+  const qc = useQueryClient();
+  const [recomputing, setRecomputing] = useState(false);
+
+  const { data: lastSynced } = useQuery({
+    queryKey: ["sync_state", userId, "graph_strength"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("sync_state")
+        .select("last_synced_at")
+        .eq("user_id", userId!)
+        .eq("provider", "graph_strength")
+        .maybeSingle();
+      return data?.last_synced_at ?? null;
+    },
+    enabled: !!userId,
+  });
+
+  const { data: topEdges } = useQuery({
+    queryKey: ["top_edges", userId, lastSynced],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("graph_edges")
+        .select(
+          "strength_score, kind, source:source_node_id(label, ref_id), target:target_node_id(label, ref_id)",
+        )
+        .in("kind", ["met_with", "co_thread", "co_attended", "knows", "worked_with"])
+        .order("strength_score", { ascending: false })
+        .limit(40);
+      if (error) throw error;
+      const rows = (data ?? []) as unknown as EdgeRow[];
+      // Dedupe undirected pairs by canonical [min, max] of ref_ids
+      const seen = new Set<string>();
+      const out: EdgeRow[] = [];
+      for (const r of rows) {
+        if (!r.source?.ref_id || !r.target?.ref_id) continue;
+        const a = r.source.ref_id;
+        const b = r.target.ref_id;
+        const key = a < b ? `${a}|${b}|${r.kind}` : `${b}|${a}|${r.kind}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(r);
+        if (out.length >= 10) break;
+      }
+      return out;
+    },
+    enabled: !!userId,
+  });
+
+  async function recompute() {
+    setRecomputing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("recompute-graph-strength", {
+        body: {},
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(
+        `Scored ${data?.edges_scored ?? 0} relationships, ${data?.orgs_scored ?? 0} organizations`,
+      );
+      await qc.invalidateQueries({ queryKey: ["sync_state", userId, "graph_strength"] });
+      await qc.invalidateQueries({ queryKey: ["top_edges", userId] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Recompute failed");
+    } finally {
+      setRecomputing(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="rounded-md bg-card hairline border p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <Network className="h-3.5 w-3.5 text-primary" /> Relationship strength
+            </p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {lastSynced
+                ? `Last computed ${new Date(lastSynced).toLocaleString()}`
+                : "Not computed yet"}
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={recompute} disabled={recomputing}>
+            {recomputing ? "Computing…" : "Recompute now"}
+          </Button>
+        </div>
+      </div>
+
+      {topEdges && topEdges.length > 0 && (
+        <div className="rounded-md bg-card hairline border p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Top connections
+          </p>
+          <ul className="space-y-1.5">
+            {topEdges.map((e, i) => (
+              <li key={i} className="flex items-center justify-between gap-2 text-xs">
+                <div className="min-w-0 flex-1 truncate">
+                  <Link
+                    to={`/contact/${e.source!.ref_id}`}
+                    className="font-medium text-foreground hover:text-primary"
+                  >
+                    {e.source!.label}
+                  </Link>
+                  <span className="text-muted-foreground"> ↔ </span>
+                  <span className="text-foreground">{e.target!.label}</span>
+                </div>
+                <span className="shrink-0 text-muted-foreground">
+                  {e.strength_score}/100 · {e.kind}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
