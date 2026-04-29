@@ -173,14 +173,15 @@ export default function ContactEditPage() {
         <Field label="Full name" required>
           <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Title">
-            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          </Field>
-          <Field label="Company">
-            <Input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} />
-          </Field>
-        </div>
+        <Field label="Title">
+          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        </Field>
+        <Field label="Company">
+          <OrgTypeahead
+            value={{ organization_id: form.organization_id, company: form.company }}
+            onChange={(v) => setForm({ ...form, organization_id: v.organization_id, company: v.company })}
+          />
+        </Field>
 
         <ListField
           label="Emails"
