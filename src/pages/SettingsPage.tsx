@@ -8,9 +8,10 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { getTheme, setTheme as applyTheme } from "@/lib/theme";
-import { Cable, LogOut, Sun, Moon, Tag, Plus, X, Building2, ChevronRight } from "lucide-react";
+import { Cable, LogOut, Sun, Moon, Tag, Plus, X, Building2, ChevronRight, Network } from "lucide-react";
 import { Link } from "react-router-dom";
 import { KismetMark } from "@/components/KismetMark";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -157,6 +158,7 @@ export default function SettingsPage() {
               <Cable className="h-4 w-4 text-muted-foreground" />
             </div>
           </div>
+          <GraphStrengthCard userId={user?.id} />
         </Group>
 
         <Button onClick={saveProfile} className="w-full bg-gradient-kismet text-primary-foreground hover:opacity-90">Save settings</Button>
