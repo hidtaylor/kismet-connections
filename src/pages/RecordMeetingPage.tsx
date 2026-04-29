@@ -111,6 +111,13 @@ export default function RecordMeetingPage() {
       );
     }
 
+    // 4. Extract candidate memories (fire-and-forget)
+    if (transcript && transcript.length > 200 && selectedContacts.length > 0) {
+      supabase.functions.invoke("extract-memories", {
+        body: { interaction_id: interaction!.id, transcript },
+      }).catch(() => {});
+    }
+
     setSaving(false);
     toast.success("Meeting saved");
     navigate("/", { replace: true });

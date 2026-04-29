@@ -16,6 +16,7 @@ import VoiceNotePage from "./pages/VoiceNotePage";
 import RecordMeetingPage from "./pages/RecordMeetingPage";
 import CalendarReviewPage from "./pages/CalendarReviewPage";
 import GmailImportPage from "./pages/GmailImportPage";
+import MemoryInboxPage from "./pages/MemoryInboxPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -62,6 +63,7 @@ const App = () => (
               <Route path="/capture/meeting" element={<RecordMeetingPage />} />
               <Route path="/import/calendar" element={<CalendarReviewPage />} />
               <Route path="/import/gmail" element={<GmailImportPage />} />
+              <Route path="/inbox/memories" element={<MemoryInboxPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

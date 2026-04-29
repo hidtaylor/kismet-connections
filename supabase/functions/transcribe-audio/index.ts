@@ -1,4 +1,6 @@
 // Transcribe an audio file from storage with OpenAI Whisper, then summarize via Lovable AI.
+// Memory extraction happens in a separate `extract-memories` function called after the
+// caller links contacts to the resulting interaction.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -15,20 +17,26 @@ Deno.serve(async (req) => {
     if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not configured");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const auth = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    const userClient = createClient(
+      SUPABASE_URL,
+      Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: auth } } }
     );
-    const { data: { user } } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
-    if (!user) return json({ error: "Unauthorized" }, 401);
+    const { data: userData } = await userClient.auth.getUser();
+    if (!userData?.user) return json({ error: "Unauthorized" }, 401);
+    const userId = userData.user.id;
+    const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { storage_path, duration_seconds, kind } = await req.json();
     if (!storage_path) return json({ error: "storage_path required" }, 400);
+    if (typeof storage_path !== "string" || !storage_path.startsWith(`${userId}/`)) {
+      return json({ error: "forbidden path" }, 403);
+    }
 
     // 1. Download audio
-    const dl = await supabase.storage.from("recordings").download(storage_path);
+    const dl = await admin.storage.from("recordings").download(storage_path);
     if (dl.error) throw dl.error;
     const audioBlob = dl.data;
 

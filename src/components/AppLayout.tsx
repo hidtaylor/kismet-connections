@@ -1,12 +1,29 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, Settings, Plus, ScanLine, Mic, UserPlus, Radio, X } from "lucide-react";
+import { Home, Search, Settings, Plus, ScanLine, Mic, UserPlus, Radio, X, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [fabOpen, setFabOpen] = useState(false);
+
+  const { data: pendingMemories } = useQuery({
+    queryKey: ["pending-memory-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("suggested_memories")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      return count ?? 0;
+    },
+    enabled: !!user,
+    refetchInterval: 60_000,
+  });
 
   // Close FAB on route change
   useEffect(() => { setFabOpen(false); }, [location.pathname]);
@@ -19,9 +36,10 @@ export function AppLayout() {
     return () => window.removeEventListener("keydown", onKey);
   }, [fabOpen]);
 
-  const tabs: Array<{ to: string; icon: typeof Home; label: string }> = [
+  const tabs: Array<{ to: string; icon: typeof Home; label: string; badge?: number }> = [
     { to: "/", icon: Home, label: "Home" },
     { to: "/search", icon: Search, label: "Search" },
+    { to: "/inbox/memories", icon: Sparkles, label: "Memories", badge: pendingMemories ?? 0 },
     { to: "/settings", icon: Settings, label: "Settings" },
   ];
 
@@ -53,12 +71,17 @@ export function AppLayout() {
                 key={t.to}
                 onClick={() => navigate(t.to)}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-md px-4 py-1.5 transition-colors",
+                  "relative flex flex-col items-center gap-0.5 rounded-md px-3 py-1.5 transition-colors",
                   active ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 )}
                 aria-label={t.label}
               >
                 <Icon className="h-5 w-5" />
+                {t.badge && t.badge > 0 ? (
+                  <span className="absolute right-1 top-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-gradient-kismet px-1 text-[9px] font-semibold text-primary-foreground">
+                    {t.badge > 99 ? "99+" : t.badge}
+                  </span>
+                ) : null}
                 <span className="text-[10px] font-medium">{t.label}</span>
               </button>
             );
