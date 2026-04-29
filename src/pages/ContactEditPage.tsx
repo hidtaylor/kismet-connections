@@ -85,6 +85,7 @@ export default function ContactEditPage() {
         first_name: existing.first_name ?? "",
         last_name: existing.last_name ?? "",
         company: existing.company ?? "",
+        organization_id: (existing as any).organization_id ?? null,
         title: existing.title ?? "",
         emails: Array.isArray(existing.emails) ? (existing.emails as any) : [],
         phones: Array.isArray(existing.phones) ? (existing.phones as any) : [],
