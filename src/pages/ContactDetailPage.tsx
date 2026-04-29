@@ -51,7 +51,7 @@ export default function ContactDetailPage() {
       const [notesRes, icRes] = await Promise.all([
         supabase
           .from("notes")
-          .select("id, body_md, transcript, created_at, interaction_id")
+          .select("id, body_md, transcript, created_at, interaction_id, sensitivity, provenance")
           .eq("contact_id", id!)
           .order("created_at", { ascending: false }),
         supabase
