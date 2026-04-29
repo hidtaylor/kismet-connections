@@ -9,6 +9,8 @@ import { useAudioRecorder, LevelMeter, fmtDuration } from "@/lib/recorder";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 
+type Sensitivity = "normal" | "sensitive" | "private";
+
 export default function VoiceNotePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -19,6 +21,7 @@ export default function VoiceNotePage() {
   const [storagePath, setStoragePath] = useState<string | null>(null);
   const [transcribing, setTranscribing] = useState(false);
   const [contactQuery, setContactQuery] = useState("");
+  const [sensitivity, setSensitivity] = useState<Sensitivity>("normal");
 
   const { data: contacts } = useQuery({
     queryKey: ["contacts-pick", contactQuery],
@@ -69,6 +72,9 @@ export default function VoiceNotePage() {
       body_md: "",
       voice_url: signed?.signedUrl ?? null,
       transcript,
+      provenance: "user_memory",
+      sensitivity,
+      confirmed_at: new Date().toISOString(),
     });
     if (error) { setLinking(false); toast.error(error.message); return; }
 
@@ -164,6 +170,22 @@ export default function VoiceNotePage() {
                   <p className="p-3 text-xs text-muted-foreground">No matches.</p>
                 )}
               </div>
+            </div>
+
+            {/* Sensitivity */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Sensitivity
+              </p>
+              <select
+                value={sensitivity}
+                onChange={(e) => setSensitivity(e.target.value as Sensitivity)}
+                className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm"
+              >
+                <option value="normal">Normal — included in AI summaries</option>
+                <option value="sensitive">Sensitive — excluded from AI</option>
+                <option value="private">Private — excluded from AI</option>
+              </select>
             </div>
 
             <Button onClick={save} disabled={linking || transcribing} className="w-full">
