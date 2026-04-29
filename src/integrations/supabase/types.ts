@@ -822,7 +822,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      recompute_graph_strength: {
+        Args: { p_user_id: string }
+        Returns: {
+          edges_scored: number
+          orgs_scored: number
+        }[]
+      }
     }
     Enums: {
       cadence_type: "close" | "monthly" | "quarterly" | "annual" | "none"
