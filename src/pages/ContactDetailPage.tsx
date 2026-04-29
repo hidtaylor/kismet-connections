@@ -199,6 +199,56 @@ export default function ContactDetailPage() {
         </div>
       </section>
 
+      {/* Quick add note */}
+      <section className="px-4 pb-4">
+        <div className="rounded-lg bg-card hairline border p-3 space-y-2">
+          <Textarea
+            value={noteBody}
+            onChange={(e) => setNoteBody(e.target.value)}
+            placeholder="Add a quick note about this person…"
+            rows={2}
+            className="resize-none"
+          />
+          <div className="flex items-center justify-between gap-2">
+            <Select value={noteSensitivity} onValueChange={(v) => setNoteSensitivity(v as any)}>
+              <SelectTrigger className="h-8 w-auto gap-1.5 border-none bg-transparent px-2 text-xs focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="normal">Normal</SelectItem>
+                <SelectItem value="sensitive">Sensitive</SelectItem>
+                <SelectItem value="private">Private</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              disabled={!noteBody.trim() || savingNote}
+              onClick={async () => {
+                if (!user || !id) return;
+                setSavingNote(true);
+                const { error } = await supabase.from("notes").insert({
+                  user_id: user.id,
+                  contact_id: id,
+                  body_md: noteBody.trim(),
+                  sensitivity: noteSensitivity,
+                  provenance: "user_memory",
+                  confirmed_at: new Date().toISOString(),
+                });
+                setSavingNote(false);
+                if (error) { toast.error(error.message); return; }
+                setNoteBody("");
+                setNoteSensitivity("normal");
+                qc.invalidateQueries({ queryKey: ["timeline", id] });
+                toast.success("Note added");
+              }}
+              className="bg-gradient-kismet text-primary-foreground hover:opacity-90"
+            >
+              <Send className="mr-1 h-3.5 w-3.5" /> Add
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Timeline */}
       <section className="pb-12">
         <div className="px-4 pb-2 pt-2">
@@ -240,6 +290,7 @@ export default function ContactDetailPage() {
               }
               const note = item.data;
               const hasVoice = !!note.transcript;
+              const isSensitive = note.sensitivity === "sensitive" || note.sensitivity === "private";
               return (
                 <div key={`n-${item.id}`} className="flex gap-3 border-b border-border px-4 py-3 last:border-0">
                   <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary">
@@ -247,9 +298,20 @@ export default function ContactDetailPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {hasVoice ? "Voice note" : "Note"}
-                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {hasVoice ? "Voice note" : "Note"}
+                        </p>
+                        {isSensitive && (
+                          <span
+                            className="inline-flex items-center gap-0.5 rounded-full bg-secondary px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-muted-foreground"
+                            title={`${note.sensitivity} — excluded from AI summaries`}
+                          >
+                            <Lock className="h-2.5 w-2.5" />
+                            {note.sensitivity}
+                          </span>
+                        )}
+                      </div>
                       <span className="shrink-0 text-[11px] text-muted-foreground">
                         {relTime(item.ts)}
                       </span>
