@@ -2,13 +2,13 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Default to dark
+// Default to light
 if (typeof document !== "undefined") {
   const stored = localStorage.getItem("kismet-theme");
-  if (stored === "light") {
-    document.documentElement.classList.remove("dark");
-  } else {
+  if (stored === "dark") {
     document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
   }
 }
 

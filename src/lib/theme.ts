@@ -1,6 +1,6 @@
-/** Theme toggle — dark default, warm light optional. */
+/** Theme toggle — light default, dark optional. */
 export function getTheme(): "dark" | "light" {
-  if (typeof document === "undefined") return "dark";
+  if (typeof document === "undefined") return "light";
   return document.documentElement.classList.contains("dark") ? "dark" : "light";
 }
 
