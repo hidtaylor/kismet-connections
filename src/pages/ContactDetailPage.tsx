@@ -1,13 +1,16 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { initials, relTime } from "@/lib/format";
-import { ArrowLeft, Pencil, Mail, Phone, Globe, MapPin, Linkedin, Twitter, Sparkles, MessageSquare, Mic, Users, Video, Phone as PhoneIcon, Building2 } from "lucide-react";
+import { ArrowLeft, Pencil, Mail, Phone, Globe, MapPin, Linkedin, Twitter, Sparkles, MessageSquare, Mic, Users, Video, Phone as PhoneIcon, Building2, Lock, Send } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { toast } from "sonner";
 
 const interactionIcon: Record<string, typeof Users> = {
   in_person: Users,
@@ -22,6 +25,10 @@ export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const qc = useQueryClient();
+  const [noteBody, setNoteBody] = useState("");
+  const [noteSensitivity, setNoteSensitivity] = useState<"normal" | "sensitive" | "private">("normal");
+  const [savingNote, setSavingNote] = useState(false);
 
   const { data: contact, isLoading } = useQuery({
     queryKey: ["contact", id],
