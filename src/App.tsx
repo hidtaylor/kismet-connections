@@ -17,6 +17,9 @@ import RecordMeetingPage from "./pages/RecordMeetingPage";
 import CalendarReviewPage from "./pages/CalendarReviewPage";
 import GmailImportPage from "./pages/GmailImportPage";
 import MemoryInboxPage from "./pages/MemoryInboxPage";
+import OrganizationsPage from "./pages/OrganizationsPage";
+import OrganizationEditPage from "./pages/OrganizationEditPage";
+import OrganizationDetailPage from "./pages/OrganizationDetailPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -64,6 +67,10 @@ const App = () => (
               <Route path="/import/calendar" element={<CalendarReviewPage />} />
               <Route path="/import/gmail" element={<GmailImportPage />} />
               <Route path="/inbox/memories" element={<MemoryInboxPage />} />
+              <Route path="/organizations" element={<OrganizationsPage />} />
+              <Route path="/organizations/new" element={<OrganizationEditPage />} />
+              <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
+              <Route path="/organizations/:id/edit" element={<OrganizationEditPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

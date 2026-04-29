@@ -8,7 +8,8 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { getTheme, setTheme as applyTheme } from "@/lib/theme";
-import { Cable, LogOut, Sun, Moon, Tag, Plus, X } from "lucide-react";
+import { Cable, LogOut, Sun, Moon, Tag, Plus, X, Building2, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { KismetMark } from "@/components/KismetMark";
 
 export default function SettingsPage() {
@@ -107,6 +108,20 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
           </Field>
+        </Group>
+
+        {/* Organizations */}
+        <Group title="Organizations">
+          <Link
+            to="/organizations"
+            className="flex items-center justify-between rounded-md bg-card hairline border px-3 py-2.5 hover:bg-accent/40"
+          >
+            <div className="flex items-center gap-2 text-sm">
+              <Building2 className="h-4 w-4 text-primary" />
+              Manage organizations
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
         </Group>
 
         {/* Tags */}
