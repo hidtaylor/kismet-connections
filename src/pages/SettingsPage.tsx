@@ -175,3 +175,59 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </div>
   );
 }
+
+function FirefliesCard({ userId }: { userId?: string }) {
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [stats, setStats] = useState<{ synced: number; linked: number; created: number } | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    supabase.from("sync_state").select("last_synced_at")
+      .eq("user_id", userId).eq("provider", "fireflies").maybeSingle()
+      .then(({ data }) => setLastSynced(data?.last_synced_at ?? null));
+  }, [userId, syncing]);
+
+  async function sync() {
+    setSyncing(true);
+    setStats(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-fireflies", { body: {} });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setStats({
+        synced: data?.synced ?? 0,
+        linked: data?.linked_to_existing ?? 0,
+        created: data?.created_contacts ?? 0,
+      });
+      toast.success(`Synced ${data?.synced ?? 0} transcripts`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  return (
+    <div className="rounded-md bg-card hairline border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Fireflies</p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {lastSynced
+              ? `Last synced ${new Date(lastSynced).toLocaleString()}`
+              : "Not synced yet"}
+          </p>
+        </div>
+        <Button size="sm" variant="outline" onClick={sync} disabled={syncing}>
+          {syncing ? "Syncing…" : "Sync now"}
+        </Button>
+      </div>
+      {stats && (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          {stats.synced} transcripts · {stats.linked} linked to meetings · {stats.created} new contacts
+        </p>
+      )}
+    </div>
+  );
+}
