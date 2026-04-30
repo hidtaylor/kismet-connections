@@ -31,7 +31,15 @@ Deno.serve(async (req) => {
       { onConflict: "user_id,provider" },
     );
 
-    return json({ ok: true, ...(Array.isArray(data) ? data[0] : data) });
+    const row = Array.isArray(data) ? data[0] : data;
+    return json({
+      ok: true,
+      edges_scored: row?.edges_scored ?? 0,
+      orgs_scored: row?.orgs_scored ?? 0,
+      pairs_computed: row?.pairs_computed ?? 0,
+      max_raw: row?.max_raw ?? 0,
+      max_score: row?.max_score ?? 0,
+    });
   } catch (e) {
     console.error("recompute-graph-strength", e);
     return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
