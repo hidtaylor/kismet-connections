@@ -826,7 +826,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: {
           edges_scored: number
+          max_raw: number
+          max_score: number
           orgs_scored: number
+          pairs_computed: number
         }[]
       }
     }
