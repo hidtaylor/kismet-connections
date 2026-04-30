@@ -371,8 +371,9 @@ function GraphStrengthCard({ userId }: { userId?: string }) {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
+      const maxRaw = Number(data?.max_raw ?? 0);
       toast.success(
-        `Scored ${data?.edges_scored ?? 0} relationships, ${data?.orgs_scored ?? 0} organizations`,
+        `Scored ${data?.edges_scored ?? 0} relationships · ${data?.orgs_scored ?? 0} orgs · ${data?.pairs_computed ?? 0} pairs · max raw ${maxRaw.toFixed(1)} · top ${data?.max_score ?? 0}/100`,
       );
       await qc.invalidateQueries({ queryKey: ["sync_state", userId, "graph_strength"] });
       await qc.invalidateQueries({ queryKey: ["top_edges", userId] });
