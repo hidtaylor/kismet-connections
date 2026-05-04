@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 export function AppLayout() {
   const location = useLocation();
@@ -154,6 +155,8 @@ export function AppLayout() {
           {fabOpen ? <X className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
         </button>
       </div>
+
+      <InstallPrompt />
     </div>
   );
 }
