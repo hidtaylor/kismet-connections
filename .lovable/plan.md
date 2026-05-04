@@ -1,46 +1,45 @@
-# Improve Scan a Card flow
+# Fix: tapping the + FAB does nothing
 
-Add a clear multi-step progress indicator and a dedicated retry control when something goes wrong, so users always know what's happening and can recover without starting over.
+## Root cause
 
-## What changes (user-facing)
+In `src/components/AppLayout.tsx` the floating action button and its radial menu live inside one full-screen overlay container:
 
-When the user taps **Read card**, the action buttons are replaced by a compact stepper showing three stages:
-
-```text
-[●] Uploading  ──  [○] Parsing  ──  [○] Ready to review
+```tsx
+<div className={cn(
+  "pointer-events-none fixed inset-0 z-50",
+  fabOpen ? "pointer-events-auto" : ""
+)}>
+  ...backdrop...
+  ...radial actions...
+  <button onClick={() => setFabOpen(v => !v)}>+</button>
+</div>
 ```
 
-- The active step pulses; completed steps show a check; pending steps are muted.
-- A thin progress bar under the stepper animates during each stage.
-- On success, the user is auto-navigated to the prefill form (existing behavior) right after "Ready to review" briefly flashes.
-- On failure at any step:
-  - The stepper marks the failing step with an error state (red dot + label like "Upload failed" / "Parsing failed").
-  - A short, human error message appears beneath (mapped from the edge function's known errors: rate limited, AI credits exhausted, forbidden path, generic).
-  - Two buttons appear: **Retry** (re-runs only from the failed step — re-upload if upload failed, re-invoke `scan-card` if parsing failed) and **Retake photo** (returns to capture).
-  - The previously captured snapshot is preserved so Retry doesn't force re-capture.
+While the menu is closed, the container has `pointer-events-none`, and nothing inside it re-enables pointer events. That means the **+** button itself can never receive the click that would open the menu — so nothing happens when the user taps it.
 
-The capture/preview area, header, and existing "Retake / Read card" buttons (pre-process state) are unchanged.
+The "Add contact" action (and Scan card, Voice note, Record meeting) are only reachable through this FAB, so the entire quick-add flow is currently broken.
 
-## Files touched
+## Fix
 
-- `src/pages/ScanCardPage.tsx` — only file edited.
-  - Replace the single `parsing` boolean with a `status` state machine: `idle | uploading | parsing | done | error`.
-  - Track `errorStep: "upload" | "parse" | null` and `errorMessage: string | null`.
-  - Track the uploaded `storage_path` separately so a parse-stage retry skips re-upload.
-  - Split `process()` into `doUpload()` and `doParse()`; `process()` calls them in sequence; `retry()` resumes from the failed stage.
-  - Add small presentational subcomponents in the same file: `<Stepper />` and `<StepDot />` using existing Tailwind tokens (`bg-primary`, `bg-muted`, `text-destructive`, `bg-gradient-kismet`). Use `lucide-react` icons already in the project (`Check`, `Loader2`, `AlertCircle`).
-  - Use the existing `Progress` component (`@/components/ui/progress`) for the thin animated bar; drive it with an indeterminate-style value (e.g., oscillating via `setInterval`) since real upload progress isn't exposed by `supabase.storage.upload`.
+Make the overlay container always ignore pointer events, and explicitly re-enable them on the elements that need to be clickable:
 
-## Technical notes
+- Backdrop: `pointer-events-auto` only when `fabOpen` is true (so it doesn't block the page when closed).
+- Radial action buttons: already only interactive when `fabOpen` is true via existing `pointer-events-none` class — add `pointer-events-auto` when open.
+- Main + button: always `pointer-events-auto` so the first tap is received.
 
-- No backend / edge function / schema changes. The `scan-card` function and `card-images` bucket usage stay identical.
-- Error mapping: read `error.message` from `supabase.functions.invoke` and from storage upload; show as-is when present, otherwise a generic fallback.
-- Cleanup: clear the progress interval on unmount and on status transitions to avoid leaks.
-- Accessibility: stepper container gets `role="status"` and `aria-live="polite"` so screen readers announce stage changes. Each step has an `aria-current="step"` when active.
-- No new dependencies.
+Concretely in `src/components/AppLayout.tsx`:
 
-## Out of scope
+1. Replace the conditional class on the outer wrapper with a constant `pointer-events-none fixed inset-0 z-50` (drop the `cn(... fabOpen ? "pointer-events-auto" : "")`).
+2. Add `pointer-events-auto` to the backdrop's class list (it's already gated behind `fabOpen` via opacity; combine with conditional `pointer-events-auto` when open).
+3. Add `pointer-events-auto` to the radial action buttons' open-state classes.
+4. Add `pointer-events-auto` to the main FAB button's class list unconditionally.
 
-- Real upload byte-progress (Supabase JS doesn't expose it for `upload()`).
-- Changes to the prefill / contact-edit screen.
-- Persisting partial scans across navigation.
+No other files need to change. The FAB animation, radial layout, badges, and routes are all unaffected.
+
+## Verification
+
+After the change, on the Home screen:
+- Tapping **+** opens the radial menu (icons fan out, backdrop blurs).
+- Tapping **Add contact** navigates to `/contact/new`.
+- Tapping the backdrop or pressing Escape closes the menu.
+- When the menu is closed, the page underneath remains scrollable and clickable (no invisible overlay blocking taps).
