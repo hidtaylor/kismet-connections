@@ -155,6 +155,8 @@ export function AppLayout() {
           {fabOpen ? <X className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
         </button>
       </div>
+
+      <InstallPrompt />
     </div>
   );
 }
