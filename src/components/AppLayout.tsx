@@ -91,18 +91,13 @@ export function AppLayout() {
       </nav>
 
       {/* FAB + radial menu */}
-      <div
-        className={cn(
-          "pointer-events-none fixed inset-0 z-50",
-          fabOpen ? "pointer-events-auto" : ""
-        )}
-      >
+      <div className="pointer-events-none fixed inset-0 z-50">
         {/* Backdrop */}
         <div
           onClick={() => setFabOpen(false)}
           className={cn(
             "absolute inset-0 bg-background/60 backdrop-blur-sm transition-opacity",
-            fabOpen ? "opacity-100" : "opacity-0"
+            fabOpen ? "pointer-events-auto opacity-100" : "opacity-0"
           )}
         />
 
@@ -120,7 +115,7 @@ export function AppLayout() {
                 className={cn(
                   "absolute right-0 bottom-0 flex h-12 w-12 items-center justify-center rounded-full bg-card text-foreground elevation-2 transition-all hairline border",
                   fabOpen
-                    ? "opacity-100"
+                    ? "pointer-events-auto opacity-100"
                     : "pointer-events-none translate-x-0 translate-y-0 opacity-0 scale-50"
                 )}
                 style={
@@ -144,7 +139,7 @@ export function AppLayout() {
         {/* Main FAB */}
         <button
           onClick={() => setFabOpen((v) => !v)}
-          className="absolute flex h-14 w-14 items-center justify-center rounded-full bg-gradient-kismet text-primary-foreground fab-shadow transition-transform"
+          className="pointer-events-auto absolute flex h-14 w-14 items-center justify-center rounded-full bg-gradient-kismet text-primary-foreground fab-shadow transition-transform"
           style={{
             right: "1.5rem",
             bottom: `calc(env(safe-area-inset-bottom) + 5rem)`,
@@ -155,6 +150,7 @@ export function AppLayout() {
           {fabOpen ? <X className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
         </button>
       </div>
+
 
       <InstallPrompt />
     </div>
