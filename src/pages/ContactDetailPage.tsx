@@ -229,12 +229,25 @@ export default function ContactDetailPage() {
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <Link
-          to={`/contact/${contact.id}/edit`}
-          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <Pencil className="h-4 w-4" /> Edit
-        </Link>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleEnrich}
+            disabled={enriching}
+            className="gap-1 text-muted-foreground hover:text-foreground"
+            aria-label="Refresh enrichment"
+          >
+            <RefreshCw className={`h-4 w-4 ${enriching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Link
+            to={`/contact/${contact.id}/edit`}
+            className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <Pencil className="h-4 w-4" /> Edit
+          </Link>
+        </div>
       </header>
 
       {/* Identity */}
