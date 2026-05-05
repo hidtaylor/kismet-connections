@@ -316,6 +316,9 @@ export default function ContactDetailPage() {
         )}
       </div>
 
+      {/* Aliases */}
+      <AliasList aliases={aliases ?? []} onMakePrimary={handleMakePrimary} />
+
       {/* AI summary */}
       <section className="px-4 pb-4">
         <div className="rounded-lg bg-card hairline border p-4">
