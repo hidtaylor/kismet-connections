@@ -31,14 +31,30 @@ const STEPS: { key: "uploading" | "parsing" | "done"; label: string }[] = [
   { key: "done", label: "Ready to review" },
 ];
 
+// Auto-capture quality thresholds
+const SHARPNESS_MIN = 120;       // variance of Laplacian
+const LUMA_MIN = 50;
+const LUMA_MAX = 220;
+const EDGE_DENSITY_MIN = 0.04;
+const PASSES_REQUIRED = 3;
+
 export default function ScanCardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const passesRef = useRef(0);
+  const capturedRef = useRef(false);
+  const startingRef = useRef(false);
+
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [snapshotBlob, setSnapshotBlob] = useState<Blob | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [hint, setHint] = useState<string>("Looking for card…");
+  const [flash, setFlash] = useState(false);
 
   const [status, setStatus] = useState<Status>("idle");
   const [errorStep, setErrorStep] = useState<ErrorStep>(null);
@@ -60,15 +76,21 @@ export default function ScanCardPage() {
   }, [status]);
 
   async function startCamera() {
+    if (startingRef.current || streamRef.current) return;
+    startingRef.current = true;
     try {
       const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       });
       streamRef.current = s;
+      setPermissionDenied(false);
       setStreaming(true);
     } catch (err: any) {
+      setPermissionDenied(true);
       toast.error(err?.message ?? "Camera permission denied");
+    } finally {
+      startingRef.current = false;
     }
   }
   function stopCamera() {
@@ -76,6 +98,27 @@ export default function ScanCardPage() {
     streamRef.current = null;
     setStreaming(false);
   }
+
+  // Auto-open camera on mount
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pause camera when tab hidden, resume when visible (and no snapshot yet)
+  useEffect(() => {
+    function onVisibility() {
+      if (document.hidden) {
+        stopCamera();
+      } else if (!snapshot && !capturedRef.current) {
+        startCamera();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [snapshot]);
+
   // Attach the stream once the <video> element is mounted
   useEffect(() => {
     if (streaming && videoRef.current && streamRef.current) {
@@ -83,9 +126,115 @@ export default function ScanCardPage() {
       videoRef.current.play().catch(() => {});
     }
   }, [streaming]);
-  useEffect(() => () => stopCamera(), []);
 
-  function snap() {
+  // Auto-capture loop: analyze frames for sharpness/lighting/edges
+  useEffect(() => {
+    if (!streaming || snapshot || capturedRef.current) return;
+    const video = videoRef.current;
+    if (!video) return;
+
+    let cancelled = false;
+    passesRef.current = 0;
+
+    if (!analysisCanvasRef.current) {
+      analysisCanvasRef.current = document.createElement("canvas");
+    }
+    const canvas = analysisCanvasRef.current;
+    const W = 320;
+    const H = 214;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    const tick = () => {
+      if (cancelled || capturedRef.current) return;
+      if (video.readyState < 2 || video.videoWidth === 0) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      // Center-crop the video into our small analysis canvas
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const targetAspect = W / H;
+      const videoAspect = vw / vh;
+      let sx = 0, sy = 0, sw = vw, sh = vh;
+      if (videoAspect > targetAspect) {
+        sw = vh * targetAspect;
+        sx = (vw - sw) / 2;
+      } else {
+        sh = vw / targetAspect;
+        sy = (vh - sh) / 2;
+      }
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
+      const img = ctx.getImageData(0, 0, W, H).data;
+
+      // Compute grayscale + luma stats
+      const gray = new Float32Array(W * H);
+      let lumaSum = 0;
+      for (let i = 0, p = 0; i < img.length; i += 4, p++) {
+        const y = 0.299 * img[i] + 0.587 * img[i + 1] + 0.114 * img[i + 2];
+        gray[p] = y;
+        lumaSum += y;
+      }
+      const lumaMean = lumaSum / (W * H);
+
+      // Laplacian variance (sharpness) + edge density
+      let lapSum = 0, lapSqSum = 0, edgeCount = 0, n = 0;
+      for (let y = 1; y < H - 1; y++) {
+        for (let x = 1; x < W - 1; x++) {
+          const i = y * W + x;
+          const lap =
+            -4 * gray[i] + gray[i - 1] + gray[i + 1] + gray[i - W] + gray[i + W];
+          lapSum += lap;
+          lapSqSum += lap * lap;
+          if (Math.abs(lap) > 25) edgeCount++;
+          n++;
+        }
+      }
+      const lapMean = lapSum / n;
+      const sharpness = lapSqSum / n - lapMean * lapMean;
+      const edgeDensity = edgeCount / n;
+
+      const lightingOk = lumaMean >= LUMA_MIN && lumaMean <= LUMA_MAX;
+      const sharpOk = sharpness >= SHARPNESS_MIN;
+      const framedOk = edgeDensity >= EDGE_DENSITY_MIN;
+
+      if (!lightingOk) {
+        passesRef.current = 0;
+        setHint(lumaMean < LUMA_MIN ? "Need more light…" : "Too bright…");
+      } else if (!framedOk) {
+        passesRef.current = 0;
+        setHint("Move closer to the card…");
+      } else if (!sharpOk) {
+        passesRef.current = 0;
+        setHint("Hold steady…");
+      } else {
+        passesRef.current += 1;
+        setHint("Hold steady…");
+        if (passesRef.current >= PASSES_REQUIRED) {
+          capturedRef.current = true;
+          setHint("Captured");
+          setFlash(true);
+          window.setTimeout(() => setFlash(false), 200);
+          snapAndProcess();
+          return;
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streaming, snapshot]);
+
+  function snapAndProcess() {
     const v = videoRef.current;
     if (!v) return;
     const canvas = document.createElement("canvas");
@@ -98,7 +247,14 @@ export default function ScanCardPage() {
       setSnapshotBlob(b);
       setSnapshot(URL.createObjectURL(b));
       stopCamera();
-    }, "image/jpeg", 0.9);
+      // Kick off pipeline immediately
+      runFrom("upload", b);
+    }, "image/jpeg", 0.92);
+  }
+
+  function manualSnap() {
+    capturedRef.current = true;
+    snapAndProcess();
   }
 
   function reset() {
@@ -108,16 +264,22 @@ export default function ScanCardPage() {
     setStatus("idle");
     setErrorStep(null);
     setErrorMessage(null);
+    setHint("Looking for card…");
+    capturedRef.current = false;
+    passesRef.current = 0;
     startCamera();
   }
 
   function handleFile(f: File) {
+    capturedRef.current = true;
+    stopCamera();
     setSnapshotBlob(f);
     setSnapshot(URL.createObjectURL(f));
     setStoragePath(null);
     setStatus("idle");
     setErrorStep(null);
     setErrorMessage(null);
+    runFrom("upload", f);
   }
 
   function friendlyError(msg: string | undefined): string {
@@ -130,11 +292,11 @@ export default function ScanCardPage() {
     return msg;
   }
 
-  async function doUpload(): Promise<string> {
-    if (!user || !snapshotBlob) throw new Error("Missing image");
+  async function doUpload(blob: Blob): Promise<string> {
+    if (!user) throw new Error("Not signed in");
     const path = `${user.id}/${crypto.randomUUID()}.jpg`;
-    const upload = await supabase.storage.from("card-images").upload(path, snapshotBlob, {
-      contentType: snapshotBlob.type || "image/jpeg",
+    const upload = await supabase.storage.from("card-images").upload(path, blob, {
+      contentType: blob.type || "image/jpeg",
     });
     if (upload.error) throw upload.error;
     setStoragePath(path);
@@ -165,19 +327,20 @@ export default function ScanCardPage() {
     navigate(`/contact/new?prefill=${prefill}`);
   }
 
-  async function runFrom(step: "upload" | "parse") {
+  async function runFrom(step: "upload" | "parse", blobOverride?: Blob) {
     setErrorStep(null);
     setErrorMessage(null);
     try {
       let path = storagePath;
       if (step === "upload" || !path) {
         setStatus("uploading");
-        path = await doUpload();
+        const blob = blobOverride ?? snapshotBlob;
+        if (!blob) throw new Error("Missing image");
+        path = await doUpload(blob);
       }
       setStatus("parsing");
       const parsed = await doParse(path!);
       setStatus("done");
-      // brief flash of "Ready to review" before navigating
       setTimeout(() => goToPrefill(parsed), 450);
     } catch (e: any) {
       const failedStep: ErrorStep = status === "uploading" || step === "upload" ? "upload" : "parse";
@@ -204,14 +367,28 @@ export default function ScanCardPage() {
       </header>
 
       <div className="px-4 py-5">
-        <div className="aspect-[3/2] w-full overflow-hidden rounded-lg bg-black">
+        <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg bg-black">
           {snapshot ? (
             <img src={snapshot} alt="Card preview" className="h-full w-full object-cover" />
           ) : streaming ? (
-            <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+            <>
+              <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
+              {/* Framing guides */}
+              <div className="pointer-events-none absolute inset-4 rounded-md border-2 border-white/60" />
+              {/* Live hint */}
+              {!showStepper && (
+                <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
+                  {hint}
+                </div>
+              )}
+              {/* Capture flash */}
+              <div className={cn("pointer-events-none absolute inset-0 bg-white transition-opacity duration-200", flash ? "opacity-80" : "opacity-0")} />
+            </>
           ) : (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              Tap "Open camera" to start
+            <div className="flex h-full items-center justify-center px-4 text-center text-sm text-muted-foreground">
+              {permissionDenied
+                ? "Camera permission was denied. Use Upload, or allow camera access and retry."
+                : "Starting camera…"}
             </div>
           )}
         </div>
@@ -241,7 +418,21 @@ export default function ScanCardPage() {
 
         {!showStepper && (
           <div className="mt-4 flex gap-2">
-            {!snapshot && !streaming && (
+            {streaming && !snapshot && (
+              <>
+                <Button onClick={manualSnap} className="flex-1">
+                  <Camera className="mr-2 h-4 w-4" /> Capture now
+                </Button>
+                <label className="inline-flex cursor-pointer items-center justify-center rounded-md border border-input bg-card px-3 text-sm">
+                  <Upload className="h-4 w-4" />
+                  <input
+                    type="file" accept="image/*" className="hidden"
+                    onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+                  />
+                </label>
+              </>
+            )}
+            {!streaming && !snapshot && (
               <>
                 <Button onClick={startCamera} className="flex-1">
                   <Camera className="mr-2 h-4 w-4" /> Open camera
@@ -255,26 +446,11 @@ export default function ScanCardPage() {
                 </label>
               </>
             )}
-            {streaming && (
-              <Button onClick={snap} className="flex-1">
-                <Camera className="mr-2 h-4 w-4" /> Capture
-              </Button>
-            )}
-            {snapshot && (
-              <>
-                <Button variant="outline" onClick={reset}>
-                  <RotateCcw className="mr-2 h-4 w-4" /> Retake
-                </Button>
-                <Button onClick={() => runFrom("upload")} className="flex-1">
-                  <Sparkles className="mr-2 h-4 w-4" /> Read card
-                </Button>
-              </>
-            )}
           </div>
         )}
 
         <p className="mt-4 text-xs text-muted-foreground text-balance">
-          Hold the card flat with good light. After parsing, you'll review and confirm the fields before saving.
+          Point the camera at the card and hold steady — it captures automatically when the image is sharp.
         </p>
       </div>
     </div>
@@ -282,13 +458,11 @@ export default function ScanCardPage() {
 }
 
 function Stepper({ status, errorStep }: { status: Status; errorStep: ErrorStep }) {
-  // Determine state for each step
   const stepState = (idx: number): "pending" | "active" | "done" | "error" => {
     const stepKey = STEPS[idx].key;
     if (status === "error") {
       if (errorStep === "upload" && stepKey === "uploading") return "error";
       if (errorStep === "parse" && stepKey === "parsing") return "error";
-      // steps before the failing one are done
       if (errorStep === "parse" && stepKey === "uploading") return "done";
       return "pending";
     }
