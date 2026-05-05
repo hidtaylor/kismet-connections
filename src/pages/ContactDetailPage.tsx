@@ -78,6 +78,27 @@ export default function ContactDetailPage() {
     enabled: !!id,
   });
 
+  const { data: connections } = useQuery({
+    queryKey: ["connections", id],
+    queryFn: async () => {
+      const { data: edges, error } = await supabase
+        .from("contact_edges")
+        .select("to_contact, edge_type, strength, evidence")
+        .eq("from_contact", id!)
+        .order("strength", { ascending: false });
+      if (error) throw error;
+      const ids = Array.from(new Set((edges ?? []).map((e: any) => e.to_contact)));
+      if (ids.length === 0) return [];
+      const { data: contacts } = await supabase
+        .from("contacts_resolved")
+        .select("id, full_name, photo_url, title, company")
+        .in("id", ids);
+      const byId = new Map((contacts ?? []).map((c: any) => [c.id, c]));
+      return (edges ?? []).map((e: any) => ({ ...e, contact: byId.get(e.to_contact) })).filter((e: any) => e.contact);
+    },
+    enabled: !!id,
+  });
+
   const handleEnrich = async () => {
     if (!id) return;
     setEnriching(true);
