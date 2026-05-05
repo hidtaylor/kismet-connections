@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { OrgTypeahead } from "@/components/OrgTypeahead";
+import { writeContactFields } from "@/lib/contact-write";
 
 type Form = {
   full_name: string;
@@ -54,16 +55,18 @@ export default function ContactEditPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [form, setForm] = useState<Form>(empty);
+  const [prefillSnapshot, setPrefillSnapshot] = useState<Partial<Form> | null>(null);
   const [saving, setSaving] = useState(false);
   const isNew = !id;
 
-  // Pre-fill from scan-card flow
+  // Pre-fill from scan-card flow; remember the prefill so we can detect edits.
   useEffect(() => {
     const prefill = params.get("prefill");
     if (prefill) {
       try {
         const data = JSON.parse(decodeURIComponent(prefill));
         setForm((f) => ({ ...f, ...data, emails: data.emails ?? [], phones: data.phones ?? [] }));
+        setPrefillSnapshot({ ...data, emails: data.emails ?? [], phones: data.phones ?? [] });
       } catch { /* ignore */ }
     }
   }, [params]);
