@@ -31,6 +31,108 @@ export default function ContactDetailPage() {
   const [noteBody, setNoteBody] = useState("");
   const [noteSensitivity, setNoteSensitivity] = useState<"normal" | "sensitive" | "private">("normal");
   const [savingNote, setSavingNote] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+
+  const { data: fieldSources } = useQuery({
+    queryKey: ["field-sources", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contact_field_sources")
+        .select("field_name, value, source, confidence, fetched_at, is_active")
+        .eq("contact_id", id!)
+        .eq("is_active", true);
+      if (error) throw error;
+      const map: Record<string, { source: string; confidence: number; fetched_at: string; value: string | null }> = {};
+      for (const r of data ?? []) map[r.field_name] = r as any;
+      return map;
+    },
+    enabled: !!id,
+  });
+
+  const { data: aliases } = useQuery({
+    queryKey: ["aliases", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("contact_aliases")
+        .select("alias_type, alias_value, source")
+        .eq("contact_id", id!);
+      if (error) throw error;
+      return (data ?? []) as Alias[];
+    },
+    enabled: !!id,
+  });
+
+  const { data: lastJob } = useQuery({
+    queryKey: ["last-enrichment", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("enrichment_jobs")
+        .select("created_at, status")
+        .eq("contact_id", id!)
+        .eq("status", "success")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!id,
+  });
+
+  const handleEnrich = async () => {
+    if (!id) return;
+    setEnriching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("enrich-contact", { body: { contact_id: id } });
+      if (error) throw error;
+      if (data?.status === "cached") toast.info("Already enriched recently");
+      else if (data?.status === "success") toast.success(`Enriched · ${data.fields_added ?? 0} fields added`);
+      else if (data?.status === "skipped") toast.info("Not enough info to enrich");
+      else toast.success("Enrichment complete");
+      qc.invalidateQueries({ queryKey: ["contact", id] });
+      qc.invalidateQueries({ queryKey: ["field-sources", id] });
+      qc.invalidateQueries({ queryKey: ["aliases", id] });
+      qc.invalidateQueries({ queryKey: ["last-enrichment", id] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Enrichment failed");
+    } finally {
+      setEnriching(false);
+    }
+  };
+
+  const handleMakePrimary = async (a: Alias) => {
+    if (!id || !user) return;
+    const fieldName = a.alias_type === "linkedin" ? "linkedin_url" : a.alias_type;
+    try {
+      // Deactivate other sources for this field
+      await supabase
+        .from("contact_field_sources")
+        .update({ is_active: false })
+        .eq("contact_id", id)
+        .eq("field_name", fieldName);
+      // Upsert as user-source active
+      await supabase.from("contact_field_sources").upsert({
+        contact_id: id,
+        user_id: user.id,
+        field_name: fieldName,
+        value: a.alias_value,
+        source: "user",
+        confidence: 100,
+        fetched_at: new Date().toISOString(),
+        is_active: true,
+      }, { onConflict: "contact_id,field_name,source" });
+      toast.success("Promoted to primary");
+      qc.invalidateQueries({ queryKey: ["contact", id] });
+      qc.invalidateQueries({ queryKey: ["field-sources", id] });
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
+  };
+
+  const fieldBadge = (field: string) => {
+    const fs = fieldSources?.[field];
+    if (!fs || fs.source === "user") return null;
+    return <EnrichmentBadge source={fs.source} confidence={fs.confidence} fetchedAt={fs.fetched_at} />;
+  };
 
   const { data: contact, isLoading } = useQuery({
     queryKey: ["contact", id],
