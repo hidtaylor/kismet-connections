@@ -20,6 +20,7 @@ import MemoryInboxPage from "./pages/MemoryInboxPage";
 import OrganizationsPage from "./pages/OrganizationsPage";
 import OrganizationEditPage from "./pages/OrganizationEditPage";
 import OrganizationDetailPage from "./pages/OrganizationDetailPage";
+import TriggersPage from "./pages/TriggersPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
