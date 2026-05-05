@@ -139,6 +139,8 @@ export default function ScanCardPage() {
 
     let cancelled = false;
     passesRef.current = 0;
+    const startedAt = performance.now();
+    let prevGray: Float32Array | null = null;
 
     if (!analysisCanvasRef.current) {
       analysisCanvasRef.current = document.createElement("canvas");
@@ -154,6 +156,14 @@ export default function ScanCardPage() {
     const tick = () => {
       if (cancelled || capturedRef.current) return;
       if (video.readyState < 2 || video.videoWidth === 0) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+
+      const elapsed = performance.now() - startedAt;
+      if (elapsed < WARMUP_MS) {
+        setHint("Adjusting camera…");
+        passesRef.current = 0;
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
@@ -174,7 +184,7 @@ export default function ScanCardPage() {
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
       const img = ctx.getImageData(0, 0, W, H).data;
 
-      // Compute grayscale + luma stats
+      // Grayscale + luma stats
       const gray = new Float32Array(W * H);
       let lumaSum = 0;
       for (let i = 0, p = 0; i < img.length; i += 4, p++) {
@@ -183,37 +193,74 @@ export default function ScanCardPage() {
         lumaSum += y;
       }
       const lumaMean = lumaSum / (W * H);
+      let lumaVar = 0;
+      for (let p = 0; p < gray.length; p++) {
+        const d = gray[p] - lumaMean;
+        lumaVar += d * d;
+      }
+      const lumaStd = Math.sqrt(lumaVar / gray.length);
 
-      // Laplacian variance (sharpness) + edge density
-      let lapSum = 0, lapSqSum = 0, edgeCount = 0, n = 0;
+      // Motion vs previous frame
+      let motion = Infinity;
+      if (prevGray) {
+        let diffSum = 0;
+        for (let p = 0; p < gray.length; p++) {
+          diffSum += Math.abs(gray[p] - prevGray[p]);
+        }
+        motion = diffSum / gray.length;
+      }
+      prevGray = gray;
+
+      // Laplacian variance (sharpness) + per-quadrant edge density
+      let lapSum = 0, lapSqSum = 0, n = 0;
+      const qEdges = [0, 0, 0, 0];
+      const qCounts = [0, 0, 0, 0];
+      const midX = W / 2;
+      const midY = H / 2;
       for (let y = 1; y < H - 1; y++) {
         for (let x = 1; x < W - 1; x++) {
           const i = y * W + x;
-          const lap =
-            -4 * gray[i] + gray[i - 1] + gray[i + 1] + gray[i - W] + gray[i + W];
+          const lap = -4 * gray[i] + gray[i - 1] + gray[i + 1] + gray[i - W] + gray[i + W];
           lapSum += lap;
           lapSqSum += lap * lap;
-          if (Math.abs(lap) > 25) edgeCount++;
+          const q = (y < midY ? 0 : 2) + (x < midX ? 0 : 1);
+          qCounts[q]++;
+          if (Math.abs(lap) > 25) qEdges[q]++;
           n++;
         }
       }
       const lapMean = lapSum / n;
       const sharpness = lapSqSum / n - lapMean * lapMean;
-      const edgeDensity = edgeCount / n;
+      const totalEdges = qEdges.reduce((a, b) => a + b, 0);
+      const edgeDensity = totalEdges / n;
+      const minQuadrant = Math.min(
+        qEdges[0] / qCounts[0],
+        qEdges[1] / qCounts[1],
+        qEdges[2] / qCounts[2],
+        qEdges[3] / qCounts[3],
+      );
 
       const lightingOk = lumaMean >= LUMA_MIN && lumaMean <= LUMA_MAX;
+      const notBlank = lumaStd >= LUMA_STD_MIN;
+      const framedOk = edgeDensity >= EDGE_DENSITY_MIN && minQuadrant >= QUADRANT_EDGE_MIN;
+      const steadyOk = motion <= MOTION_MAX;
       const sharpOk = sharpness >= SHARPNESS_MIN;
-      const framedOk = edgeDensity >= EDGE_DENSITY_MIN;
 
       if (!lightingOk) {
         passesRef.current = 0;
         setHint(lumaMean < LUMA_MIN ? "Need more light…" : "Too bright…");
+      } else if (!notBlank) {
+        passesRef.current = 0;
+        setHint("Point at a card…");
       } else if (!framedOk) {
         passesRef.current = 0;
-        setHint("Move closer to the card…");
-      } else if (!sharpOk) {
+        setHint("Center the card in the frame…");
+      } else if (!steadyOk) {
         passesRef.current = 0;
         setHint("Hold steady…");
+      } else if (!sharpOk) {
+        passesRef.current = 0;
+        setHint("Focusing…");
       } else {
         passesRef.current += 1;
         setHint("Hold steady…");
