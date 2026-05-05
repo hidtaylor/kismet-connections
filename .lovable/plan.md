@@ -1,45 +1,42 @@
-# Fix: tapping the + FAB does nothing
+# Fix: "Open camera" button shows no preview
 
 ## Root cause
 
-In `src/components/AppLayout.tsx` the floating action button and its radial menu live inside one full-screen overlay container:
+In `src/pages/ScanCardPage.tsx`, the `<video>` element is only rendered when `streaming === true`:
 
 ```tsx
-<div className={cn(
-  "pointer-events-none fixed inset-0 z-50",
-  fabOpen ? "pointer-events-auto" : ""
-)}>
-  ...backdrop...
-  ...radial actions...
-  <button onClick={() => setFabOpen(v => !v)}>+</button>
-</div>
+{snapshot ? (...) : streaming ? (
+  <video ref={videoRef} ... />
+) : (...)}
 ```
 
-While the menu is closed, the container has `pointer-events-none`, and nothing inside it re-enables pointer events. That means the **+** button itself can never receive the click that would open the menu — so nothing happens when the user taps it.
+But `startCamera()` tries to attach the MediaStream to `videoRef.current` **before** flipping `streaming` to true:
 
-The "Add contact" action (and Scan card, Voice note, Record meeting) are only reachable through this FAB, so the entire quick-add flow is currently broken.
+```ts
+const s = await navigator.mediaDevices.getUserMedia({...});
+streamRef.current = s;
+if (videoRef.current) {           // <-- null, video isn't mounted yet
+  videoRef.current.srcObject = s;
+  await videoRef.current.play();
+}
+setStreaming(true);               // video mounts only now
+```
+
+Because `videoRef.current` is `null` at that moment, the stream is never bound to the element. After `setStreaming(true)` the `<video>` mounts empty — hence "no preview".
 
 ## Fix
 
-Make the overlay container always ignore pointer events, and explicitly re-enable them on the elements that need to be clickable:
+In `src/pages/ScanCardPage.tsx`:
 
-- Backdrop: `pointer-events-auto` only when `fabOpen` is true (so it doesn't block the page when closed).
-- Radial action buttons: already only interactive when `fabOpen` is true via existing `pointer-events-none` class — add `pointer-events-auto` when open.
-- Main + button: always `pointer-events-auto` so the first tap is received.
+1. In `startCamera()`, request the stream, store it in `streamRef`, then immediately call `setStreaming(true)` (drop the inline assignment to `videoRef.current.srcObject`).
+2. Add a `useEffect` keyed on `streaming` that, when `streaming` becomes true and both `videoRef.current` and `streamRef.current` exist, sets `videoRef.current.srcObject = streamRef.current` and calls `.play()` (catching the AbortError silently).
 
-Concretely in `src/components/AppLayout.tsx`:
+This guarantees the stream is attached after React mounts the `<video>` element. `getUserMedia` is still invoked synchronously inside the click handler, preserving the user-gesture chain.
 
-1. Replace the conditional class on the outer wrapper with a constant `pointer-events-none fixed inset-0 z-50` (drop the `cn(... fabOpen ? "pointer-events-auto" : "")`).
-2. Add `pointer-events-auto` to the backdrop's class list (it's already gated behind `fabOpen` via opacity; combine with conditional `pointer-events-auto` when open).
-3. Add `pointer-events-auto` to the radial action buttons' open-state classes.
-4. Add `pointer-events-auto` to the main FAB button's class list unconditionally.
-
-No other files need to change. The FAB animation, radial layout, badges, and routes are all unaffected.
+No other files need to change.
 
 ## Verification
 
-After the change, on the Home screen:
-- Tapping **+** opens the radial menu (icons fan out, backdrop blurs).
-- Tapping **Add contact** navigates to `/contact/new`.
-- Tapping the backdrop or pressing Escape closes the menu.
-- When the menu is closed, the page underneath remains scrollable and clickable (no invisible overlay blocking taps).
+- Tap **+ → Scan card → Open camera**: browser prompts for camera permission, then the live camera preview renders inside the framed area.
+- Tap **Capture**: snapshot replaces the live feed; tracks are stopped.
+- Navigating away (or unmounting) still stops all tracks.

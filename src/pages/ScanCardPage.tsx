@@ -66,10 +66,6 @@ export default function ScanCardPage() {
         audio: false,
       });
       streamRef.current = s;
-      if (videoRef.current) {
-        videoRef.current.srcObject = s;
-        await videoRef.current.play();
-      }
       setStreaming(true);
     } catch (err: any) {
       toast.error(err?.message ?? "Camera permission denied");
@@ -80,6 +76,13 @@ export default function ScanCardPage() {
     streamRef.current = null;
     setStreaming(false);
   }
+  // Attach the stream once the <video> element is mounted
+  useEffect(() => {
+    if (streaming && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [streaming]);
   useEffect(() => () => stopCamera(), []);
 
   function snap() {
