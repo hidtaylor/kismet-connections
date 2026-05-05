@@ -6,11 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { initials, relTime } from "@/lib/format";
-import { ArrowLeft, Pencil, Mail, Phone, Globe, MapPin, Linkedin, Twitter, Sparkles, MessageSquare, Mic, Users, Video, Phone as PhoneIcon, Building2, Lock, Send } from "lucide-react";
+import { ArrowLeft, Pencil, Mail, Phone, Globe, MapPin, Linkedin, Twitter, Sparkles, MessageSquare, Mic, Users, Video, Phone as PhoneIcon, Building2, Lock, Send, RefreshCw } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { EnrichmentBadge } from "@/components/EnrichmentBadge";
+import { AliasList, type Alias } from "@/components/AliasList";
 
 const interactionIcon: Record<string, typeof Users> = {
   in_person: Users,
