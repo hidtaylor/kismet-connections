@@ -1,5 +1,4 @@
-// Scan a business card image with Lovable AI (Gemini Flash, vision-capable).
-// Downloads image from user's storage path (no external URL accepted).
+// Scan a business card image (front + optional back) with Lovable AI (Gemini Flash, vision).
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -25,30 +24,40 @@ Deno.serve(async (req) => {
 
     const admin = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    const { storage_path } = await req.json();
-    if (!storage_path || typeof storage_path !== "string") {
-      return json({ error: "storage_path required" }, 400);
-    }
-    if (!storage_path.startsWith(`${user.id}/`)) {
-      return json({ error: "forbidden path" }, 403);
+    const body = await req.json();
+    let paths: string[] = [];
+    if (Array.isArray(body?.storage_paths)) paths = body.storage_paths;
+    else if (typeof body?.storage_path === "string") paths = [body.storage_path];
+
+    paths = paths.filter((p) => typeof p === "string" && p.length > 0).slice(0, 2);
+    if (paths.length === 0) return json({ error: "storage_path(s) required" }, 400);
+    for (const p of paths) {
+      if (!p.startsWith(`${user.id}/`)) return json({ error: "forbidden path" }, 403);
     }
 
-    // Download image from storage
-    const dl = await admin.storage.from("card-images").download(storage_path);
-    if (dl.error) throw dl.error;
-    const buf = await dl.data.arrayBuffer();
-    // Chunked base64 to avoid call-stack overflow on large images
-    const bytes = new Uint8Array(buf);
-    let bin = "";
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-      bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+    // Download all images and base64-encode them
+    const imageParts: { type: "image_url"; image_url: { url: string } }[] = [];
+    for (const path of paths) {
+      const dl = await admin.storage.from("card-images").download(path);
+      if (dl.error) throw dl.error;
+      const buf = await dl.data.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)) as any);
+      }
+      const b64 = btoa(bin);
+      const mime = dl.data.type || "image/jpeg";
+      imageParts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${b64}` } });
     }
-    const b64 = btoa(bin);
-    const mime = dl.data.type || "image/jpeg";
-    const dataUrl = `data:${mime};base64,${b64}`;
 
-    const prompt = `You are a precise OCR + parser. Extract structured contact info from this business card image.
+    const sideNote = paths.length === 2
+      ? "There are TWO images: image 1 is the FRONT of a single business card, image 2 is the BACK of the SAME card. Merge information from both sides into one contact. Prefer non-empty values; deduplicate emails and phone numbers; for raw_text, concatenate front then back separated by a line `--- BACK ---`."
+      : "There is ONE image of a business card.";
+
+    const prompt = `You are a precise OCR + parser. Extract structured contact info from the business card image(s).
+${sideNote}
 Return ONLY a JSON object matching this exact schema (no prose, no markdown):
 {
   "full_name": string|null,
@@ -74,7 +83,7 @@ Use empty arrays for none, null for missing single fields. raw_text must contain
           role: "user",
           content: [
             { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: dataUrl } },
+            ...imageParts,
           ],
         }],
         response_format: { type: "json_object" },
@@ -94,11 +103,10 @@ Use empty arrays for none, null for missing single fields. raw_text must contain
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { parsed = { raw_text: content }; }
 
-    // Persist scan record (image_url column stores the storage path)
     await userClient.from("card_scans").insert({
       user_id: user.id,
-      image_url: storage_path,
-      ocr_json: { raw_text: parsed.raw_text ?? "" },
+      image_url: paths[0],
+      ocr_json: { raw_text: parsed.raw_text ?? "", storage_paths: paths },
       parsed_json: parsed,
       status: "parsed",
     });
