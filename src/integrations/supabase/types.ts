@@ -116,6 +116,13 @@ export type Database = {
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "card_scans_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
+            referencedColumns: ["id"]
+          },
         ]
       }
       contact_aliases: {
@@ -149,6 +156,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_aliases_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
             referencedColumns: ["id"]
           },
         ]
@@ -190,10 +204,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contact_edges_from_contact_fkey"
+            columns: ["from_contact"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "contact_edges_to_contact_fkey"
             columns: ["to_contact"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_edges_to_contact_fkey"
+            columns: ["to_contact"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
             referencedColumns: ["id"]
           },
         ]
@@ -237,6 +265,13 @@ export type Database = {
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "contact_field_sources_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
+            referencedColumns: ["id"]
+          },
         ]
       }
       contact_tags: {
@@ -261,6 +296,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_tags_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
             referencedColumns: ["id"]
           },
           {
@@ -433,6 +475,13 @@ export type Database = {
             referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "enrichment_jobs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
+            referencedColumns: ["id"]
+          },
         ]
       }
       events: {
@@ -603,6 +652,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "interaction_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "interaction_contacts_interaction_id_fkey"
             columns: ["interaction_id"]
             isOneToOne: false
@@ -705,6 +761,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
             referencedColumns: ["id"]
           },
           {
@@ -899,6 +962,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "suggested_memories_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "suggested_memories_source_interaction_id_fkey"
             columns: ["source_interaction_id"]
             isOneToOne: false
@@ -993,9 +1063,92 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      contacts_resolved: {
+        Row: {
+          cadence: Database["public"]["Enums"]["cadence_type"] | null
+          company: string | null
+          created_at: string | null
+          email: string | null
+          emails: Json | null
+          first_name: string | null
+          full_name: string | null
+          id: string | null
+          last_contact_at: string | null
+          last_name: string | null
+          linkedin_url: string | null
+          location: string | null
+          organization_id: string | null
+          phone: string | null
+          phones: Json | null
+          photo_url: string | null
+          title: string | null
+          twitter_url: string | null
+          updated_at: string | null
+          user_id: string | null
+          website_url: string | null
+        }
+        Insert: {
+          cadence?: Database["public"]["Enums"]["cadence_type"] | null
+          company?: never
+          created_at?: string | null
+          email?: never
+          emails?: Json | null
+          first_name?: never
+          full_name?: never
+          id?: string | null
+          last_contact_at?: string | null
+          last_name?: never
+          linkedin_url?: never
+          location?: never
+          organization_id?: string | null
+          phone?: never
+          phones?: Json | null
+          photo_url?: never
+          title?: never
+          twitter_url?: never
+          updated_at?: string | null
+          user_id?: string | null
+          website_url?: never
+        }
+        Update: {
+          cadence?: Database["public"]["Enums"]["cadence_type"] | null
+          company?: never
+          created_at?: string | null
+          email?: never
+          emails?: Json | null
+          first_name?: never
+          full_name?: never
+          id?: string | null
+          last_contact_at?: string | null
+          last_name?: never
+          linkedin_url?: never
+          location?: never
+          organization_id?: string | null
+          phone?: never
+          phones?: Json | null
+          photo_url?: never
+          title?: never
+          twitter_url?: never
+          updated_at?: string | null
+          user_id?: string | null
+          website_url?: never
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      get_active_contact_value: {
+        Args: { p_contact_id: string; p_field_name: string }
+        Returns: string
+      }
       recompute_graph_strength: {
         Args: { p_user_id: string }
         Returns: {
