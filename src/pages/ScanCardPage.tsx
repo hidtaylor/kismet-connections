@@ -31,12 +31,16 @@ const STEPS: { key: "uploading" | "parsing" | "done"; label: string }[] = [
   { key: "done", label: "Ready to review" },
 ];
 
-// Auto-capture quality thresholds
-const SHARPNESS_MIN = 120;       // variance of Laplacian
-const LUMA_MIN = 50;
-const LUMA_MAX = 220;
-const EDGE_DENSITY_MIN = 0.04;
-const PASSES_REQUIRED = 3;
+// Auto-capture quality thresholds (tuned to avoid premature snaps)
+const SHARPNESS_MIN = 250;        // variance of Laplacian
+const LUMA_MIN = 60;
+const LUMA_MAX = 215;
+const LUMA_STD_MIN = 18;          // reject blank/uniform frames
+const EDGE_DENSITY_MIN = 0.07;    // overall edge presence
+const QUADRANT_EDGE_MIN = 0.03;   // each of 4 quadrants must have edges (card fills frame)
+const PASSES_REQUIRED = 8;        // ~500–800ms of consistently good frames
+const WARMUP_MS = 1500;           // ignore first frames after camera opens
+const MOTION_MAX = 12;            // mean abs luma diff vs prev frame
 
 export default function ScanCardPage() {
   const navigate = useNavigate();
