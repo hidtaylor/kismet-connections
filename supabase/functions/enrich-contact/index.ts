@@ -33,22 +33,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claims, error: claimsErr } = await supabase.auth.getClaims(token);
-    if (claimsErr || !claims?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const userId = claims.claims.sub as string;
 
     const body = await req.json().catch(() => ({}));
     const contactId = body?.contact_id;
@@ -56,8 +44,28 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "contact_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Validate ownership
-    const { data: contact, error: cErr } = await supabase
+    // Allow service-role system calls (from refresh-stale-contacts) to specify user_id explicitly.
+    const token = authHeader.replace("Bearer ", "");
+    const isSystem = token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") && typeof body?._system_user_id === "string";
+
+    let userId: string;
+    if (isSystem) {
+      userId = body._system_user_id;
+    } else {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: claims, error: claimsErr } = await supabase.auth.getClaims(token);
+      if (claimsErr || !claims?.claims) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      userId = claims.claims.sub as string;
+    }
+
+    // Validate ownership via admin client
+    const { data: contact, error: cErr } = await admin
       .from("contacts")
       .select("id, user_id, full_name, company, location, emails, phones, linkedin_url")
       .eq("id", contactId)
@@ -206,6 +214,10 @@ Deno.serve(async (req) => {
     const likelihood: number = pdlJson?.likelihood ?? 0; // 0-10
     const conf = Math.max(0, Math.min(100, Math.round(likelihood * 10)));
 
+    // Snapshot active company/title before write for change detection
+    const beforeCompany = (resolved as any)?.company ?? null;
+    const beforeTitle = (resolved as any)?.title ?? null;
+
     if (person && pdlStatus === "success") {
       const map: Record<string, any> = {
         full_name: person.full_name,
@@ -304,6 +316,29 @@ Deno.serve(async (req) => {
     // ---------- Recompute activation per touched field ----------
     for (const f of fieldsToActivate) {
       await admin.rpc("recompute_field_activation", { p_contact_id: contactId, p_field_name: f });
+    }
+
+    // ---------- Diff company/title for job-change events ----------
+    if (pdlStatus === "success") {
+      const { data: afterRow } = await admin
+        .from("contacts_resolved")
+        .select("company, title")
+        .eq("id", contactId)
+        .maybeSingle();
+      const afterCompany = afterRow?.company ?? null;
+      const afterTitle = afterRow?.title ?? null;
+      const events: any[] = [];
+      const norm = (s: any) => (s ? String(s).trim().toLowerCase() : "");
+      const companyChanged = beforeCompany && afterCompany && norm(beforeCompany) !== norm(afterCompany);
+      const titleChanged = beforeTitle && afterTitle && norm(beforeTitle) !== norm(afterTitle);
+      if (companyChanged && titleChanged) {
+        events.push({ user_id: userId, contact_id: contactId, event_type: "job_change", before_value: `${beforeTitle} @ ${beforeCompany}`, after_value: `${afterTitle} @ ${afterCompany}` });
+      } else if (companyChanged) {
+        events.push({ user_id: userId, contact_id: contactId, event_type: "company_change", before_value: beforeCompany, after_value: afterCompany });
+      } else if (titleChanged) {
+        events.push({ user_id: userId, contact_id: contactId, event_type: "title_change", before_value: beforeTitle, after_value: afterTitle });
+      }
+      if (events.length) await admin.from("contact_events").insert(events);
     }
 
     return new Response(JSON.stringify({

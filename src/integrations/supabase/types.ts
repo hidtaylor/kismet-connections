@@ -226,6 +226,57 @@ export type Database = {
           },
         ]
       }
+      contact_events: {
+        Row: {
+          acted_on_at: string | null
+          after_value: string | null
+          before_value: string | null
+          contact_id: string
+          detected_at: string
+          dismissed_at: string | null
+          event_type: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          acted_on_at?: string | null
+          after_value?: string | null
+          before_value?: string | null
+          contact_id: string
+          detected_at?: string
+          dismissed_at?: string | null
+          event_type: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          acted_on_at?: string | null
+          after_value?: string | null
+          before_value?: string | null
+          contact_id?: string
+          detected_at?: string
+          dismissed_at?: string | null
+          event_type?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_events_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_resolved"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_field_sources: {
         Row: {
           confidence: number

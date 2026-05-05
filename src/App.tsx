@@ -20,6 +20,7 @@ import MemoryInboxPage from "./pages/MemoryInboxPage";
 import OrganizationsPage from "./pages/OrganizationsPage";
 import OrganizationEditPage from "./pages/OrganizationEditPage";
 import OrganizationDetailPage from "./pages/OrganizationDetailPage";
+import TriggersPage from "./pages/TriggersPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -67,6 +68,7 @@ const App = () => (
               <Route path="/import/calendar" element={<CalendarReviewPage />} />
               <Route path="/import/gmail" element={<GmailImportPage />} />
               <Route path="/inbox/memories" element={<MemoryInboxPage />} />
+              <Route path="/triggers" element={<TriggersPage />} />
               <Route path="/organizations" element={<OrganizationsPage />} />
               <Route path="/organizations/new" element={<OrganizationEditPage />} />
               <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
