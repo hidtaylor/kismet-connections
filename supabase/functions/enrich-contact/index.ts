@@ -33,22 +33,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
-    );
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
-
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claims, error: claimsErr } = await supabase.auth.getClaims(token);
-    if (claimsErr || !claims?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const userId = claims.claims.sub as string;
 
     const body = await req.json().catch(() => ({}));
     const contactId = body?.contact_id;
@@ -56,8 +44,28 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "contact_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Validate ownership
-    const { data: contact, error: cErr } = await supabase
+    // Allow service-role system calls (from refresh-stale-contacts) to specify user_id explicitly.
+    const token = authHeader.replace("Bearer ", "");
+    const isSystem = token === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") && typeof body?._system_user_id === "string";
+
+    let userId: string;
+    if (isSystem) {
+      userId = body._system_user_id;
+    } else {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data: claims, error: claimsErr } = await supabase.auth.getClaims(token);
+      if (claimsErr || !claims?.claims) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      userId = claims.claims.sub as string;
+    }
+
+    // Validate ownership via admin client
+    const { data: contact, error: cErr } = await admin
       .from("contacts")
       .select("id, user_id, full_name, company, location, emails, phones, linkedin_url")
       .eq("id", contactId)
