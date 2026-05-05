@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, Settings, Plus, ScanLine, Mic, UserPlus, Radio, X, Sparkles } from "lucide-react";
+import { Home, Search, Settings, Plus, ScanLine, Mic, UserPlus, Radio, X, Sparkles, Bell } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
