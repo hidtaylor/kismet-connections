@@ -78,6 +78,27 @@ export default function ContactDetailPage() {
     enabled: !!id,
   });
 
+  const { data: connections } = useQuery({
+    queryKey: ["connections", id],
+    queryFn: async () => {
+      const { data: edges, error } = await supabase
+        .from("contact_edges")
+        .select("to_contact, edge_type, strength, evidence")
+        .eq("from_contact", id!)
+        .order("strength", { ascending: false });
+      if (error) throw error;
+      const ids = Array.from(new Set((edges ?? []).map((e: any) => e.to_contact)));
+      if (ids.length === 0) return [];
+      const { data: contacts } = await supabase
+        .from("contacts_resolved")
+        .select("id, full_name, photo_url, title, company")
+        .in("id", ids);
+      const byId = new Map((contacts ?? []).map((c: any) => [c.id, c]));
+      return (edges ?? []).map((e: any) => ({ ...e, contact: byId.get(e.to_contact) })).filter((e: any) => e.contact);
+    },
+    enabled: !!id,
+  });
+
   const handleEnrich = async () => {
     if (!id) return;
     setEnriching(true);
@@ -318,6 +339,47 @@ export default function ContactDetailPage() {
 
       {/* Aliases */}
       <AliasList aliases={aliases ?? []} onMakePrimary={handleMakePrimary} />
+
+      {/* Connections */}
+      {connections && connections.length > 0 && (
+        <section className="px-4 pb-4">
+          <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Connections
+          </h2>
+          <div className="rounded-lg bg-card hairline border divide-y divide-border">
+            {connections.map((c: any) => {
+              let chip = c.edge_type.replace(/_/g, " ");
+              if (c.edge_type === "same_employer" && c.evidence?.company) {
+                const yrs = c.evidence?.overlap_years;
+                chip = `worked together at ${c.evidence.company}${yrs ? `, ${yrs}y overlap` : ""}`;
+              } else if (c.edge_type === "past_colleague" && c.evidence?.companies?.[0]) {
+                chip = `past colleague at ${c.evidence.companies[0]}`;
+              } else if (c.edge_type === "education_overlap" && c.evidence?.school) {
+                chip = `school: ${c.evidence.school}`;
+              }
+              return (
+                <Link
+                  key={`${c.to_contact}-${c.edge_type}`}
+                  to={`/contact/${c.to_contact}`}
+                  className="flex items-center gap-3 px-3 py-2 hover:bg-secondary/50"
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={c.contact.photo_url ?? undefined} />
+                    <AvatarFallback className="text-xs bg-secondary">{initials(c.contact.full_name)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{c.contact.full_name}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">{chip}</p>
+                  </div>
+                  <span className="shrink-0 text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {c.strength}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* AI summary */}
       <section className="px-4 pb-4">
