@@ -1,41 +1,34 @@
 ## Goal
 
-After the first auto-capture, give the user the option to scan the **back of the card**, then send **both images** to the parser so fields from either side end up in the prefilled contact.
+Unblock automated browser testing of the contact Refresh button by adding email + password authentication to the existing magic-link login. Then verify the `enrich-contact` edge function returns 2xx and updates company/title.
 
-## Flow
+## Why
 
-1. Tap **Scan card** → camera opens, auto-captures **front** (current behavior).
-2. New screen state: "Front captured" — show the front thumbnail and two buttons:
-   - **Add back side** → re-opens camera, auto-captures a 2nd image (back).
-   - **Skip — use front only** → runs parse with just the front (current behavior).
-3. After back is captured (or skipped), upload all images and call `scan-card` with both, then navigate to `/contact/new?prefill=…` as today.
-4. "Retake" buttons let the user redo either side individually before parsing.
+The browser tool runs in a sandboxed session that can't follow magic-link emails (the link opens in a different browser context, so the session never gets the token). Without a password path, I can't sign in to click Refresh and observe the network response.
 
-## UI changes (`src/pages/ScanCardPage.tsx`)
+## Changes
 
-- Replace single `snapshot/snapshotBlob` with `frontBlob/frontUrl` and `backBlob/backUrl` state.
-- After auto-capture sets the front, **do not** auto-run the pipeline. Instead show a "Front captured" review card with thumbnail + the two buttons above.
-- "Add back side" resets `capturedRef`, restarts the camera, and the same auto-capture loop fires for the back. When the back is captured, immediately run the pipeline with both blobs.
-- "Skip" runs the pipeline with only the front.
-- Retake-front / retake-back buttons clear the respective blob and restart the camera for that side.
-- Stepper / progress UI is unchanged; "Uploading" step now uploads 1 or 2 images sequentially.
+1. **`src/pages/AuthPage.tsx`** — Add a tabbed interface:
+   - Tab 1: existing magic link (default).
+   - Tab 2: email + password with Sign in / Sign up actions, using `supabase.auth.signInWithPassword` and `supabase.auth.signUp` (with `emailRedirectTo: window.location.origin`).
+   - Surface errors via existing toast pattern.
+   - No new tables needed; `auth.users` handles passwords.
 
-## Edge function changes (`supabase/functions/scan-card/index.ts`)
+2. **Auth settings** — Ensure email/password provider is enabled and email auto-confirm is on for the test account so I don't need to click a verification link in the sandbox. (If you'd rather keep confirmation required, you can manually confirm a test user in Cloud → Users.)
 
-- Accept either `storage_path: string` (back-compat) or `storage_paths: string[]` (1 or 2 entries, validated, each must start with `${user.id}/`).
-- Download all provided images, base64 each, and send them as multiple `image_url` content parts in the **same** Gemini message.
-- Update the prompt to: "These images are the front and back of the same business card. Merge information from both sides into a single contact. Prefer non-empty fields; deduplicate emails/phones; concatenate raw_text with a `--- BACK ---` separator."
-- Persist a single `card_scans` row using the **first** image's storage path in `image_url` (column is non-null text); store all paths in `ocr_json.storage_paths` for traceability and the merged parsed JSON in `parsed_json`.
-- Return `{ parsed }` exactly as today so the client navigation logic stays the same.
+## Verification flow (after the change)
 
-## Verification
-
-- Scan front only → "Skip" → parse runs as before, prefill page is correct.
-- Scan front → "Add back side" → camera re-opens, auto-captures back → parse runs with both → prefill page includes fields that only appear on the back (e.g. address, secondary email).
-- Retake front before adding back: replaces front blob, no extra upload.
-- Old clients sending `storage_path` (single) keep working.
+1. I sign in as a test user with password.
+2. Navigate to `/contact/a0db437b-59ce-47a3-9472-f664b417c442` (Kismet-Connection / Lovable).
+3. Click Refresh, capture the network response from `/functions/v1/enrich-contact`.
+4. Confirm 2xx status and a non-error JSON body (`status: success | cached | duplicate | skipped`).
+5. Query `enrichment_jobs`, `contact_field_sources`, and `contacts_resolved` to confirm company/title fields were written and activated, and check `contact_events` for any job_change rows.
 
 ## Out of scope
 
-- No more than 2 sides.
-- No client-side OCR/merge — merging is done by the model in one call (cheaper and more accurate than two calls + manual reconcile).
+- Forgot-password flow / reset-password page (can add later if needed).
+- Replacing magic link — it stays as the default.
+
+## Test credentials
+
+Tell me the email you want me to use, or I can sign up a fresh `qa+kismet@…` account during verification.

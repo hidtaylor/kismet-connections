@@ -252,14 +252,15 @@ Deno.serve(async (req) => {
       }
 
       // Aliases: extra emails, phones, work history
+      const toArr = (v: any): any[] => Array.isArray(v) ? v : [];
       const aliasRows: any[] = [];
-      for (const e of person.emails ?? []) {
+      for (const e of toArr(person.emails)) {
         if (e?.address) aliasRows.push({ contact_id: contactId, user_id: userId, alias_type: "email", alias_value: e.address, source: "pdl" });
       }
-      for (const p of person.phone_numbers ?? []) {
+      for (const p of toArr(person.phone_numbers)) {
         if (typeof p === "string") aliasRows.push({ contact_id: contactId, user_id: userId, alias_type: "phone", alias_value: p, source: "pdl" });
       }
-      for (const exp of person.experience ?? []) {
+      for (const exp of toArr(person.experience)) {
         const cn = exp?.company?.name;
         if (cn) aliasRows.push({ contact_id: contactId, user_id: userId, alias_type: "employer", alias_value: cn, source: "pdl" });
       }
@@ -269,13 +270,13 @@ Deno.serve(async (req) => {
       }
 
       // Store work_history + education as serialized JSON for graph derivation
-      const workHistory = (person.experience ?? []).map((e: any) => ({
+      const workHistory = toArr(person.experience).map((e: any) => ({
         company: e?.company?.name ?? null,
         title: e?.title?.name ?? null,
         start_year: e?.start_date ? Number(String(e.start_date).slice(0, 4)) : null,
         end_year: e?.end_date ? Number(String(e.end_date).slice(0, 4)) : (e?.is_primary ? new Date().getFullYear() : null),
       })).filter((e: any) => e.company);
-      const education = (person.education ?? []).map((e: any) => ({
+      const education = toArr(person.education).map((e: any) => ({
         school: e?.school?.name ?? null,
         start_year: e?.start_date ? Number(String(e.start_date).slice(0, 4)) : null,
         end_year: e?.end_date ? Number(String(e.end_date).slice(0, 4)) : null,
