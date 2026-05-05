@@ -1155,6 +1155,10 @@ export type Database = {
         Args: { p_contact_id: string; p_field_name: string }
         Returns: string
       }
+      recompute_field_activation: {
+        Args: { p_contact_id: string; p_field_name: string }
+        Returns: undefined
+      }
       recompute_graph_strength: {
         Args: { p_user_id: string }
         Returns: {
