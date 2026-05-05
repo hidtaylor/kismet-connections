@@ -351,12 +351,12 @@ export default function ScanCardPage() {
     return path;
   }
 
-  async function doParse(paths: string[]): Promise<Parsed> {
+  async function doParse(paths: string[]): Promise<{ parsed: Parsed; contact_id: string | null }> {
     const { data, error } = await supabase.functions.invoke("scan-card", {
       body: { storage_paths: paths },
     });
     if (error) throw error;
-    return (data?.parsed ?? {}) as Parsed;
+    return { parsed: (data?.parsed ?? {}) as Parsed, contact_id: data?.contact_id ?? null };
   }
 
   function goToPrefill(parsed: Parsed) {
@@ -388,9 +388,12 @@ export default function ScanCardPage() {
         setStoragePaths(paths);
       }
       setStatus("parsing");
-      const parsed = await doParse(paths);
+      const { parsed, contact_id } = await doParse(paths);
       setStatus("done");
-      setTimeout(() => goToPrefill(parsed), 450);
+      setTimeout(() => {
+        if (contact_id) navigate(`/contact/${contact_id}`);
+        else goToPrefill(parsed);
+      }, 450);
     } catch (e: any) {
       const failedStep: ErrorStep = status === "parsing" ? "parse" : "upload";
       setErrorStep(failedStep);
