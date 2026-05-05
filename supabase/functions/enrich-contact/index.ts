@@ -206,6 +206,10 @@ Deno.serve(async (req) => {
     const likelihood: number = pdlJson?.likelihood ?? 0; // 0-10
     const conf = Math.max(0, Math.min(100, Math.round(likelihood * 10)));
 
+    // Snapshot active company/title before write for change detection
+    const beforeCompany = (resolved as any)?.company ?? null;
+    const beforeTitle = (resolved as any)?.title ?? null;
+
     if (person && pdlStatus === "success") {
       const map: Record<string, any> = {
         full_name: person.full_name,
