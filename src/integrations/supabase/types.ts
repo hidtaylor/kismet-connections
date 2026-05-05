@@ -1347,6 +1347,7 @@ export type Database = {
         Row: {
           cadence: Database["public"]["Enums"]["cadence_type"] | null
           company: string | null
+          company_id: string | null
           created_at: string | null
           email: string | null
           emails: Json | null
@@ -1372,6 +1373,7 @@ export type Database = {
         Insert: {
           cadence?: Database["public"]["Enums"]["cadence_type"] | null
           company?: never
+          company_id?: string | null
           created_at?: string | null
           email?: never
           emails?: Json | null
@@ -1397,6 +1399,7 @@ export type Database = {
         Update: {
           cadence?: Database["public"]["Enums"]["cadence_type"] | null
           company?: never
+          company_id?: string | null
           created_at?: string | null
           email?: never
           emails?: Json | null
@@ -1420,6 +1423,20 @@ export type Database = {
           website_url?: never
         }
         Relationships: [
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_resolved"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contacts_organization_id_fkey"
             columns: ["organization_id"]
