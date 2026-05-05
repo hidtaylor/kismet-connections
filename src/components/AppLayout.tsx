@@ -26,6 +26,19 @@ export function AppLayout() {
     refetchInterval: 60_000,
   });
 
+  const { data: triggerCount } = useQuery({
+    queryKey: ["contact-events-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("contact_events")
+        .select("id", { count: "exact", head: true })
+        .is("dismissed_at", null);
+      return count ?? 0;
+    },
+    enabled: !!user,
+    refetchInterval: 60_000,
+  });
+
   // Close FAB on route change
   useEffect(() => { setFabOpen(false); }, [location.pathname]);
 
@@ -40,6 +53,7 @@ export function AppLayout() {
   const tabs: Array<{ to: string; icon: typeof Home; label: string; badge?: number }> = [
     { to: "/", icon: Home, label: "Home" },
     { to: "/search", icon: Search, label: "Search" },
+    { to: "/triggers", icon: Bell, label: "Triggers", badge: triggerCount ?? 0 },
     { to: "/inbox/memories", icon: Sparkles, label: "Memories", badge: pendingMemories ?? 0 },
     { to: "/settings", icon: Settings, label: "Settings" },
   ];
