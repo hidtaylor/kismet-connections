@@ -255,6 +255,36 @@ Deno.serve(async (req) => {
       if (aliasRows.length) {
         await admin.from("contact_aliases").upsert(aliasRows, { onConflict: "contact_id,alias_type,alias_value" });
       }
+
+      // Store work_history + education as serialized JSON for graph derivation
+      const workHistory = (person.experience ?? []).map((e: any) => ({
+        company: e?.company?.name ?? null,
+        title: e?.title?.name ?? null,
+        start_year: e?.start_date ? Number(String(e.start_date).slice(0, 4)) : null,
+        end_year: e?.end_date ? Number(String(e.end_date).slice(0, 4)) : (e?.is_primary ? new Date().getFullYear() : null),
+      })).filter((e: any) => e.company);
+      const education = (person.education ?? []).map((e: any) => ({
+        school: e?.school?.name ?? null,
+        start_year: e?.start_date ? Number(String(e.start_date).slice(0, 4)) : null,
+        end_year: e?.end_date ? Number(String(e.end_date).slice(0, 4)) : null,
+      })).filter((e: any) => e.school);
+
+      for (const [field, arr] of [["work_history", workHistory], ["education", education]] as const) {
+        if (arr.length === 0) continue;
+        await admin.from("contact_field_sources").upsert({
+          contact_id: contactId,
+          user_id: userId,
+          field_name: field,
+          value: JSON.stringify(arr),
+          source: "pdl",
+          confidence: conf,
+          fetched_at: new Date().toISOString(),
+          is_active: true,
+        }, { onConflict: "contact_id,field_name,source" });
+      }
+
+      // Fire-and-forget edge derivation for this user
+      admin.functions.invoke("derive-edges", { body: { user_id: userId } }).catch(() => {});
     }
 
     // ---------- Job log ----------
