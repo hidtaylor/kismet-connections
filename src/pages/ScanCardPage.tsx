@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { AlertCircle, ArrowLeft, Camera, Check, Loader2, RotateCcw, Sparkles, Upload } from "lucide-react";
+import { AlertCircle, ArrowLeft, Camera, Check, Loader2, Plus, RotateCcw, Sparkles, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +24,7 @@ type Parsed = {
 
 type Status = "idle" | "uploading" | "parsing" | "done" | "error";
 type ErrorStep = "upload" | "parse" | null;
+type Side = "front" | "back";
 
 const STEPS: { key: "uploading" | "parsing" | "done"; label: string }[] = [
   { key: "uploading", label: "Uploading" },
@@ -32,15 +33,15 @@ const STEPS: { key: "uploading" | "parsing" | "done"; label: string }[] = [
 ];
 
 // Auto-capture quality thresholds (tuned to avoid premature snaps)
-const SHARPNESS_MIN = 250;        // variance of Laplacian
+const SHARPNESS_MIN = 250;
 const LUMA_MIN = 60;
 const LUMA_MAX = 215;
-const LUMA_STD_MIN = 18;          // reject blank/uniform frames
-const EDGE_DENSITY_MIN = 0.07;    // overall edge presence
-const QUADRANT_EDGE_MIN = 0.03;   // each of 4 quadrants must have edges (card fills frame)
-const PASSES_REQUIRED = 8;        // ~500–800ms of consistently good frames
-const WARMUP_MS = 1500;           // ignore first frames after camera opens
-const MOTION_MAX = 12;            // mean abs luma diff vs prev frame
+const LUMA_STD_MIN = 18;
+const EDGE_DENSITY_MIN = 0.07;
+const QUADRANT_EDGE_MIN = 0.03;
+const PASSES_REQUIRED = 8;
+const WARMUP_MS = 1500;
+const MOTION_MAX = 12;
 
 export default function ScanCardPage() {
   const navigate = useNavigate();
@@ -53,8 +54,16 @@ export default function ScanCardPage() {
   const capturedRef = useRef(false);
   const startingRef = useRef(false);
 
-  const [snapshot, setSnapshot] = useState<string | null>(null);
-  const [snapshotBlob, setSnapshotBlob] = useState<Blob | null>(null);
+  // Per-side capture state
+  const [frontBlob, setFrontBlob] = useState<Blob | null>(null);
+  const [frontUrl, setFrontUrl] = useState<string | null>(null);
+  const [backBlob, setBackBlob] = useState<Blob | null>(null);
+  const [backUrl, setBackUrl] = useState<string | null>(null);
+  const [activeSide, setActiveSide] = useState<Side>("front");
+  // "review" = front captured, prompting to add back or finish
+  // "capturing" = camera open and (auto-)capturing the activeSide
+  const [phase, setPhase] = useState<"capturing" | "review">("capturing");
+
   const [streaming, setStreaming] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [hint, setHint] = useState<string>("Looking for card…");
@@ -63,7 +72,7 @@ export default function ScanCardPage() {
   const [status, setStatus] = useState<Status>("idle");
   const [errorStep, setErrorStep] = useState<ErrorStep>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [storagePath, setStoragePath] = useState<string | null>(null);
+  const [storagePaths, setStoragePaths] = useState<string[] | null>(null);
   const [progress, setProgress] = useState(0);
 
   // Animate indeterminate progress bar while in uploading/parsing
@@ -110,18 +119,18 @@ export default function ScanCardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Pause camera when tab hidden, resume when visible (and no snapshot yet)
+  // Pause camera when tab hidden, resume when capturing
   useEffect(() => {
     function onVisibility() {
       if (document.hidden) {
         stopCamera();
-      } else if (!snapshot && !capturedRef.current) {
+      } else if (phase === "capturing" && !capturedRef.current) {
         startCamera();
       }
     }
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, [snapshot]);
+  }, [phase]);
 
   // Attach the stream once the <video> element is mounted
   useEffect(() => {
@@ -131,9 +140,9 @@ export default function ScanCardPage() {
     }
   }, [streaming]);
 
-  // Auto-capture loop: analyze frames for sharpness/lighting/edges
+  // Auto-capture loop: analyze frames for sharpness/lighting/edges/motion
   useEffect(() => {
-    if (!streaming || snapshot || capturedRef.current) return;
+    if (!streaming || phase !== "capturing" || capturedRef.current) return;
     const video = videoRef.current;
     if (!video) return;
 
@@ -142,9 +151,7 @@ export default function ScanCardPage() {
     const startedAt = performance.now();
     let prevGray: Float32Array | null = null;
 
-    if (!analysisCanvasRef.current) {
-      analysisCanvasRef.current = document.createElement("canvas");
-    }
+    if (!analysisCanvasRef.current) analysisCanvasRef.current = document.createElement("canvas");
     const canvas = analysisCanvasRef.current;
     const W = 320;
     const H = 214;
@@ -160,31 +167,23 @@ export default function ScanCardPage() {
         return;
       }
 
-      const elapsed = performance.now() - startedAt;
-      if (elapsed < WARMUP_MS) {
+      if (performance.now() - startedAt < WARMUP_MS) {
         setHint("Adjusting camera…");
         passesRef.current = 0;
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
 
-      // Center-crop the video into our small analysis canvas
       const vw = video.videoWidth;
       const vh = video.videoHeight;
       const targetAspect = W / H;
       const videoAspect = vw / vh;
       let sx = 0, sy = 0, sw = vw, sh = vh;
-      if (videoAspect > targetAspect) {
-        sw = vh * targetAspect;
-        sx = (vw - sw) / 2;
-      } else {
-        sh = vw / targetAspect;
-        sy = (vh - sh) / 2;
-      }
+      if (videoAspect > targetAspect) { sw = vh * targetAspect; sx = (vw - sw) / 2; }
+      else { sh = vw / targetAspect; sy = (vh - sh) / 2; }
       ctx.drawImage(video, sx, sy, sw, sh, 0, 0, W, H);
       const img = ctx.getImageData(0, 0, W, H).data;
 
-      // Grayscale + luma stats
       const gray = new Float32Array(W * H);
       let lumaSum = 0;
       for (let i = 0, p = 0; i < img.length; i += 4, p++) {
@@ -194,29 +193,21 @@ export default function ScanCardPage() {
       }
       const lumaMean = lumaSum / (W * H);
       let lumaVar = 0;
-      for (let p = 0; p < gray.length; p++) {
-        const d = gray[p] - lumaMean;
-        lumaVar += d * d;
-      }
+      for (let p = 0; p < gray.length; p++) { const d = gray[p] - lumaMean; lumaVar += d * d; }
       const lumaStd = Math.sqrt(lumaVar / gray.length);
 
-      // Motion vs previous frame
       let motion = Infinity;
       if (prevGray) {
         let diffSum = 0;
-        for (let p = 0; p < gray.length; p++) {
-          diffSum += Math.abs(gray[p] - prevGray[p]);
-        }
+        for (let p = 0; p < gray.length; p++) diffSum += Math.abs(gray[p] - prevGray[p]);
         motion = diffSum / gray.length;
       }
       prevGray = gray;
 
-      // Laplacian variance (sharpness) + per-quadrant edge density
       let lapSum = 0, lapSqSum = 0, n = 0;
       const qEdges = [0, 0, 0, 0];
       const qCounts = [0, 0, 0, 0];
-      const midX = W / 2;
-      const midY = H / 2;
+      const midX = W / 2, midY = H / 2;
       for (let y = 1; y < H - 1; y++) {
         for (let x = 1; x < W - 1; x++) {
           const i = y * W + x;
@@ -234,10 +225,8 @@ export default function ScanCardPage() {
       const totalEdges = qEdges.reduce((a, b) => a + b, 0);
       const edgeDensity = totalEdges / n;
       const minQuadrant = Math.min(
-        qEdges[0] / qCounts[0],
-        qEdges[1] / qCounts[1],
-        qEdges[2] / qCounts[2],
-        qEdges[3] / qCounts[3],
+        qEdges[0] / qCounts[0], qEdges[1] / qCounts[1],
+        qEdges[2] / qCounts[2], qEdges[3] / qCounts[3],
       );
 
       const lightingOk = lumaMean >= LUMA_MIN && lumaMean <= LUMA_MAX;
@@ -246,22 +235,12 @@ export default function ScanCardPage() {
       const steadyOk = motion <= MOTION_MAX;
       const sharpOk = sharpness >= SHARPNESS_MIN;
 
-      if (!lightingOk) {
-        passesRef.current = 0;
-        setHint(lumaMean < LUMA_MIN ? "Need more light…" : "Too bright…");
-      } else if (!notBlank) {
-        passesRef.current = 0;
-        setHint("Point at a card…");
-      } else if (!framedOk) {
-        passesRef.current = 0;
-        setHint("Center the card in the frame…");
-      } else if (!steadyOk) {
-        passesRef.current = 0;
-        setHint("Hold steady…");
-      } else if (!sharpOk) {
-        passesRef.current = 0;
-        setHint("Focusing…");
-      } else {
+      if (!lightingOk) { passesRef.current = 0; setHint(lumaMean < LUMA_MIN ? "Need more light…" : "Too bright…"); }
+      else if (!notBlank) { passesRef.current = 0; setHint("Point at a card…"); }
+      else if (!framedOk) { passesRef.current = 0; setHint("Center the card in the frame…"); }
+      else if (!steadyOk) { passesRef.current = 0; setHint("Hold steady…"); }
+      else if (!sharpOk) { passesRef.current = 0; setHint("Focusing…"); }
+      else {
         passesRef.current += 1;
         setHint("Hold steady…");
         if (passesRef.current >= PASSES_REQUIRED) {
@@ -269,23 +248,21 @@ export default function ScanCardPage() {
           setHint("Captured");
           setFlash(true);
           window.setTimeout(() => setFlash(false), 200);
-          snapAndProcess();
+          snapCurrentSide();
           return;
         }
       }
-
       rafRef.current = requestAnimationFrame(tick);
     };
-
     rafRef.current = requestAnimationFrame(tick);
     return () => {
       cancelled = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streaming, snapshot]);
+  }, [streaming, phase]);
 
-  function snapAndProcess() {
+  function snapCurrentSide() {
     const v = videoRef.current;
     if (!v) return;
     const canvas = document.createElement("canvas");
@@ -295,42 +272,63 @@ export default function ScanCardPage() {
     ctx?.drawImage(v, 0, 0);
     canvas.toBlob((b) => {
       if (!b) return;
-      setSnapshotBlob(b);
-      setSnapshot(URL.createObjectURL(b));
+      const url = URL.createObjectURL(b);
+      const side = activeSide;
       stopCamera();
-      // Kick off pipeline immediately
-      runFrom("upload", b);
+      if (side === "front") {
+        setFrontBlob(b);
+        setFrontUrl(url);
+        setPhase("review");
+      } else {
+        setBackBlob(b);
+        setBackUrl(url);
+        // Auto-run pipeline as soon as back is captured
+        runPipeline(frontBlob!, b);
+      }
     }, "image/jpeg", 0.92);
   }
 
   function manualSnap() {
     capturedRef.current = true;
-    snapAndProcess();
+    snapCurrentSide();
   }
 
-  function reset() {
-    setSnapshot(null);
-    setSnapshotBlob(null);
-    setStoragePath(null);
-    setStatus("idle");
-    setErrorStep(null);
-    setErrorMessage(null);
+  function startSideCapture(side: Side) {
+    setActiveSide(side);
+    setPhase("capturing");
     setHint("Looking for card…");
     capturedRef.current = false;
     passesRef.current = 0;
     startCamera();
   }
 
+  function retakeFront() {
+    if (frontUrl) URL.revokeObjectURL(frontUrl);
+    setFrontBlob(null);
+    setFrontUrl(null);
+    startSideCapture("front");
+  }
+
+  function retakeBack() {
+    if (backUrl) URL.revokeObjectURL(backUrl);
+    setBackBlob(null);
+    setBackUrl(null);
+    startSideCapture("back");
+  }
+
   function handleFile(f: File) {
     capturedRef.current = true;
     stopCamera();
-    setSnapshotBlob(f);
-    setSnapshot(URL.createObjectURL(f));
-    setStoragePath(null);
-    setStatus("idle");
-    setErrorStep(null);
-    setErrorMessage(null);
-    runFrom("upload", f);
+    const url = URL.createObjectURL(f);
+    if (activeSide === "front") {
+      setFrontBlob(f);
+      setFrontUrl(url);
+      setPhase("review");
+    } else {
+      setBackBlob(f);
+      setBackUrl(url);
+      runPipeline(frontBlob!, f);
+    }
   }
 
   function friendlyError(msg: string | undefined): string {
@@ -343,20 +341,19 @@ export default function ScanCardPage() {
     return msg;
   }
 
-  async function doUpload(blob: Blob): Promise<string> {
+  async function uploadOne(blob: Blob): Promise<string> {
     if (!user) throw new Error("Not signed in");
     const path = `${user.id}/${crypto.randomUUID()}.jpg`;
     const upload = await supabase.storage.from("card-images").upload(path, blob, {
       contentType: blob.type || "image/jpeg",
     });
     if (upload.error) throw upload.error;
-    setStoragePath(path);
     return path;
   }
 
-  async function doParse(path: string): Promise<Parsed> {
+  async function doParse(paths: string[]): Promise<Parsed> {
     const { data, error } = await supabase.functions.invoke("scan-card", {
-      body: { storage_path: path },
+      body: { storage_paths: paths },
     });
     if (error) throw error;
     return (data?.parsed ?? {}) as Parsed;
@@ -378,31 +375,55 @@ export default function ScanCardPage() {
     navigate(`/contact/new?prefill=${prefill}`);
   }
 
-  async function runFrom(step: "upload" | "parse", blobOverride?: Blob) {
+  async function runPipeline(front: Blob, back: Blob | null) {
     setErrorStep(null);
     setErrorMessage(null);
+    setStatus("uploading");
     try {
-      let path = storagePath;
-      if (step === "upload" || !path) {
-        setStatus("uploading");
-        const blob = blobOverride ?? snapshotBlob;
-        if (!blob) throw new Error("Missing image");
-        path = await doUpload(blob);
+      let paths = storagePaths;
+      if (!paths) {
+        const blobs = back ? [front, back] : [front];
+        paths = [];
+        for (const b of blobs) paths.push(await uploadOne(b));
+        setStoragePaths(paths);
       }
       setStatus("parsing");
-      const parsed = await doParse(path!);
+      const parsed = await doParse(paths);
       setStatus("done");
       setTimeout(() => goToPrefill(parsed), 450);
     } catch (e: any) {
-      const failedStep: ErrorStep = status === "uploading" || step === "upload" ? "upload" : "parse";
+      const failedStep: ErrorStep = status === "parsing" ? "parse" : "upload";
       setErrorStep(failedStep);
       setErrorMessage(friendlyError(e?.message));
       setStatus("error");
     }
   }
 
+  function finishWithFrontOnly() {
+    if (!frontBlob) return;
+    runPipeline(frontBlob, null);
+  }
+
+  function fullReset() {
+    if (frontUrl) URL.revokeObjectURL(frontUrl);
+    if (backUrl) URL.revokeObjectURL(backUrl);
+    setFrontBlob(null); setFrontUrl(null);
+    setBackBlob(null); setBackUrl(null);
+    setStoragePaths(null);
+    setStatus("idle");
+    setErrorStep(null);
+    setErrorMessage(null);
+    setHint("Looking for card…");
+    capturedRef.current = false;
+    passesRef.current = 0;
+    setActiveSide("front");
+    setPhase("capturing");
+    startCamera();
+  }
+
   const processing = status === "uploading" || status === "parsing" || status === "done";
   const showStepper = processing || status === "error";
+  const inReview = phase === "review" && !showStepper;
 
   return (
     <div className="mx-auto w-full max-w-md">
@@ -413,26 +434,33 @@ export default function ScanCardPage() {
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-sm font-medium">Scan business card</h1>
+        <h1 className="text-sm font-medium">
+          {inReview ? "Front captured" : activeSide === "back" ? "Scan back of card" : "Scan business card"}
+        </h1>
         <div className="w-10" />
       </header>
 
       <div className="px-4 py-5">
+        {/* Live camera / preview area */}
         <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg bg-black">
-          {snapshot ? (
-            <img src={snapshot} alt="Card preview" className="h-full w-full object-cover" />
+          {inReview && frontUrl ? (
+            <img src={frontUrl} alt="Front of card" className="h-full w-full object-cover" />
+          ) : showStepper ? (
+            <img
+              src={(activeSide === "back" && backUrl) ? backUrl : (frontUrl ?? "")}
+              alt="Card preview"
+              className="h-full w-full object-cover"
+            />
           ) : streaming ? (
             <>
               <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />
-              {/* Framing guides */}
               <div className="pointer-events-none absolute inset-4 rounded-md border-2 border-white/60" />
-              {/* Live hint */}
-              {!showStepper && (
-                <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
-                  {hint}
-                </div>
-              )}
-              {/* Capture flash */}
+              <div className="pointer-events-none absolute top-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                {activeSide === "front" ? "Front" : "Back"}
+              </div>
+              <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
+                {hint}
+              </div>
               <div className={cn("pointer-events-none absolute inset-0 bg-white transition-opacity duration-200", flash ? "opacity-80" : "opacity-0")} />
             </>
           ) : (
@@ -444,6 +472,27 @@ export default function ScanCardPage() {
           )}
         </div>
 
+        {/* Review state: front captured, choose to add back or finish */}
+        {inReview && (
+          <div className="mt-5 space-y-4">
+            <p className="text-sm text-muted-foreground text-balance">
+              Got the front. If the card has info on the back (extra address, phone, email), scan it too.
+            </p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={retakeFront} className="flex-1">
+                <RotateCcw className="mr-2 h-4 w-4" /> Retake front
+              </Button>
+              <Button onClick={() => startSideCapture("back")} className="flex-1">
+                <Plus className="mr-2 h-4 w-4" /> Add back side
+              </Button>
+            </div>
+            <Button variant="secondary" onClick={finishWithFrontOnly} className="w-full">
+              <Sparkles className="mr-2 h-4 w-4" /> Use front only
+            </Button>
+          </div>
+        )}
+
+        {/* Stepper / processing */}
         {showStepper && (
           <div className="mt-5 space-y-3">
             <Stepper status={status} errorStep={errorStep} />
@@ -456,10 +505,10 @@ export default function ScanCardPage() {
             )}
             {status === "error" && (
               <div className="flex gap-2">
-                <Button variant="outline" onClick={reset} className="flex-1">
-                  <RotateCcw className="mr-2 h-4 w-4" /> Retake photo
+                <Button variant="outline" onClick={fullReset} className="flex-1">
+                  <RotateCcw className="mr-2 h-4 w-4" /> Start over
                 </Button>
-                <Button onClick={() => runFrom(errorStep ?? "upload")} className="flex-1">
+                <Button onClick={() => runPipeline(frontBlob!, backBlob)} className="flex-1">
                   <Sparkles className="mr-2 h-4 w-4" /> Retry
                 </Button>
               </div>
@@ -467,9 +516,10 @@ export default function ScanCardPage() {
           </div>
         )}
 
-        {!showStepper && (
+        {/* Capturing controls */}
+        {!showStepper && !inReview && (
           <div className="mt-4 flex gap-2">
-            {streaming && !snapshot && (
+            {streaming && (
               <>
                 <Button onClick={manualSnap} className="flex-1">
                   <Camera className="mr-2 h-4 w-4" /> Capture now
@@ -483,7 +533,7 @@ export default function ScanCardPage() {
                 </label>
               </>
             )}
-            {!streaming && !snapshot && (
+            {!streaming && (
               <>
                 <Button onClick={startCamera} className="flex-1">
                   <Camera className="mr-2 h-4 w-4" /> Open camera
@@ -497,12 +547,21 @@ export default function ScanCardPage() {
                 </label>
               </>
             )}
+            {activeSide === "back" && (
+              <Button variant="ghost" onClick={retakeBack} className="shrink-0">
+                Skip
+              </Button>
+            )}
           </div>
         )}
 
-        <p className="mt-4 text-xs text-muted-foreground text-balance">
-          Point the camera at the card and hold steady — it captures automatically when the image is sharp.
-        </p>
+        {!showStepper && !inReview && (
+          <p className="mt-4 text-xs text-muted-foreground text-balance">
+            {activeSide === "front"
+              ? "Point the camera at the card and hold steady — it captures automatically when sharp."
+              : "Flip the card and point at the back — it captures automatically when sharp."}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -549,10 +608,7 @@ function Stepper({ status, errorStep }: { status: Status; errorStep: ErrorStep }
                 : step.label}
             </span>
             {i < STEPS.length - 1 && (
-              <div className={cn(
-                "h-px flex-1",
-                s === "done" ? "bg-primary" : "bg-border",
-              )} />
+              <div className={cn("h-px flex-1", s === "done" ? "bg-primary" : "bg-border")} />
             )}
           </div>
         );

@@ -1,33 +1,41 @@
-## Problem
+## Goal
 
-The auto-capture is firing on empty/blurry frames. Current thresholds are too lax, there's no warm-up period (camera's autoexposure/autofocus need ~1s to settle), no motion check, and edge density is computed over the whole frame so a high-contrast background (hand, edge of desk) can satisfy it without the card actually being in view.
+After the first auto-capture, give the user the option to scan the **back of the card**, then send **both images** to the parser so fields from either side end up in the prefilled contact.
 
-## Fix (single file: `src/pages/ScanCardPage.tsx`)
+## Flow
 
-Tighten the auto-capture detector and add stability gating.
+1. Tap **Scan card** → camera opens, auto-captures **front** (current behavior).
+2. New screen state: "Front captured" — show the front thumbnail and two buttons:
+   - **Add back side** → re-opens camera, auto-captures a 2nd image (back).
+   - **Skip — use front only** → runs parse with just the front (current behavior).
+3. After back is captured (or skipped), upload all images and call `scan-card` with both, then navigate to `/contact/new?prefill=…` as today.
+4. "Retake" buttons let the user redo either side individually before parsing.
 
-### Stricter thresholds
-- `SHARPNESS_MIN`: 120 → **250** (Laplacian variance).
-- `EDGE_DENSITY_MIN`: 0.04 → **0.07**.
-- `PASSES_REQUIRED`: 3 → **8** consecutive frames (~500–800ms of sustained quality).
-- `LUMA_MIN/MAX`: 60 / 215.
+## UI changes (`src/pages/ScanCardPage.tsx`)
 
-### New gates
-1. **Warm-up**: ignore frames for the first **1500ms** after camera starts (autoexposure/autofocus settling). Hint: "Adjusting camera…".
-2. **Luma standard deviation ≥ 18**: rejects blank/near-uniform frames (lens cap, white wall, ceiling). Hint: "Point at a card…".
-3. **Quadrant edge coverage**: split the analysis crop into 4 quadrants; each must have edge density ≥ **0.03**. This guarantees the card fills the framed area instead of one corner. Hint: "Center the card in the frame…".
-4. **Motion check**: keep previous grayscale buffer; compute mean absolute difference vs current. Require **≤ 12** (out of 255) — i.e. camera is steady. Hint: "Hold steady…".
-5. **Reset passes counter** whenever any gate fails, so partial progress doesn't accumulate across unrelated good frames.
+- Replace single `snapshot/snapshotBlob` with `frontBlob/frontUrl` and `backBlob/backUrl` state.
+- After auto-capture sets the front, **do not** auto-run the pipeline. Instead show a "Front captured" review card with thumbnail + the two buttons above.
+- "Add back side" resets `capturedRef`, restarts the camera, and the same auto-capture loop fires for the back. When the back is captured, immediately run the pipeline with both blobs.
+- "Skip" runs the pipeline with only the front.
+- Retake-front / retake-back buttons clear the respective blob and restart the camera for that side.
+- Stepper / progress UI is unchanged; "Uploading" step now uploads 1 or 2 images sequentially.
 
-### Hint priority (most informative wins)
-warm-up → lighting → uniform/blank → framing (quadrants) → motion → sharpness → "Hold steady… (capturing)".
+## Edge function changes (`supabase/functions/scan-card/index.ts`)
 
-### Cooldown
-Once auto-capture fires, the loop already stops via `capturedRef`. No change there.
+- Accept either `storage_path: string` (back-compat) or `storage_paths: string[]` (1 or 2 entries, validated, each must start with `${user.id}/`).
+- Download all provided images, base64 each, and send them as multiple `image_url` content parts in the **same** Gemini message.
+- Update the prompt to: "These images are the front and back of the same business card. Merge information from both sides into a single contact. Prefer non-empty fields; deduplicate emails/phones; concatenate raw_text with a `--- BACK ---` separator."
+- Persist a single `card_scans` row using the **first** image's storage path in `image_url` (column is non-null text); store all paths in `ocr_json.storage_paths` for traceability and the merged parsed JSON in `parsed_json`.
+- Return `{ parsed }` exactly as today so the client navigation logic stays the same.
 
 ## Verification
 
-- Pointing the phone at the ceiling, a hand, or a blank wall: hint cycles through "Point at a card…" / "Center the card…" — no capture fires.
-- Moving the phone around a card: hint stays "Hold steady…", no capture.
-- Holding a card flat & steady within the frame for ~0.7s after the camera settles: capture fires once and pipeline runs.
-- "Capture now" button still forces an immediate snap.
+- Scan front only → "Skip" → parse runs as before, prefill page is correct.
+- Scan front → "Add back side" → camera re-opens, auto-captures back → parse runs with both → prefill page includes fields that only appear on the back (e.g. address, secondary email).
+- Retake front before adding back: replaces front blob, no extra upload.
+- Old clients sending `storage_path` (single) keep working.
+
+## Out of scope
+
+- No more than 2 sides.
+- No client-side OCR/merge — merging is done by the model in one call (cheaper and more accurate than two calls + manual reconcile).
