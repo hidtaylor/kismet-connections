@@ -25,7 +25,7 @@ export default function OrganizationDetailPage() {
     queryKey: ["org-contacts", id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("contacts")
+        .from("contacts_resolved")
         .select("id, full_name, title, photo_url")
         .eq("organization_id", id!)
         .order("full_name", { ascending: true });

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { initials } from "@/lib/format";
 import { OrgTypeahead } from "@/components/OrgTypeahead";
+import { writeContactFields } from "@/lib/contact-write";
 
 type Form = {
   full_name: string;
@@ -54,16 +55,18 @@ export default function ContactEditPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [form, setForm] = useState<Form>(empty);
+  const [prefillSnapshot, setPrefillSnapshot] = useState<Partial<Form> | null>(null);
   const [saving, setSaving] = useState(false);
   const isNew = !id;
 
-  // Pre-fill from scan-card flow
+  // Pre-fill from scan-card flow; remember the prefill so we can detect edits.
   useEffect(() => {
     const prefill = params.get("prefill");
     if (prefill) {
       try {
         const data = JSON.parse(decodeURIComponent(prefill));
         setForm((f) => ({ ...f, ...data, emails: data.emails ?? [], phones: data.phones ?? [] }));
+        setPrefillSnapshot({ ...data, emails: data.emails ?? [], phones: data.phones ?? [] });
       } catch { /* ignore */ }
     }
   }, [params]);
@@ -115,24 +118,88 @@ export default function ContactEditPage() {
       return;
     }
     setSaving(true);
-    const payload = {
-      ...form,
-      user_id: user.id,
-      emails: form.emails.filter(Boolean),
-      phones: form.phones.filter(Boolean),
-    };
-    if (isNew) {
-      const { data, error } = await supabase.from("contacts").insert(payload).select("id").single();
+
+    // Provenance-tracked text fields. emails/phones are array columns and
+    // remain on the canonical row; we tag the primary email/phone via RPC.
+    const trackable = {
+      full_name: form.full_name,
+      first_name: form.first_name,
+      last_name: form.last_name,
+      company: form.company,
+      title: form.title,
+      location: form.location,
+      linkedin_url: form.linkedin_url,
+      twitter_url: form.twitter_url,
+      website_url: form.website_url,
+      photo_url: form.photo_url ?? "",
+      email: form.emails[0] ?? "",
+      phone: form.phones[0] ?? "",
+    } as Record<string, string>;
+
+    // Split into card_scan vs user based on prefill snapshot.
+    const cardScanFields: Record<string, string> = {};
+    const userFields: Record<string, string> = {};
+    for (const [k, v] of Object.entries(trackable)) {
+      const prefilled = prefillSnapshot
+        ? (k === "email"
+            ? (prefillSnapshot.emails?.[0] ?? "")
+            : k === "phone"
+              ? (prefillSnapshot.phones?.[0] ?? "")
+              : ((prefillSnapshot as any)[k] ?? ""))
+        : undefined;
+      if (prefillSnapshot && prefilled !== undefined && prefilled !== "" && prefilled === v) {
+        cardScanFields[k] = v;
+      } else if (v !== "") {
+        userFields[k] = v;
+      }
+    }
+
+    try {
+      let contactId = id!;
+      if (isNew) {
+        // Insert canonical row first (RLS requires user_id) — provenance follows.
+        const { data, error } = await supabase
+          .from("contacts")
+          .insert({
+            user_id: user.id,
+            full_name: form.full_name,
+            organization_id: form.organization_id,
+            emails: form.emails.filter(Boolean),
+            phones: form.phones.filter(Boolean),
+            cadence: form.cadence,
+            source: prefillSnapshot ? "card_scan" : "manual",
+          })
+          .select("id")
+          .single();
+        if (error) throw error;
+        contactId = data.id;
+      } else {
+        // Update non-provenance fields directly (org/cadence/array columns).
+        const { error } = await supabase
+          .from("contacts")
+          .update({
+            organization_id: form.organization_id,
+            emails: form.emails.filter(Boolean),
+            phones: form.phones.filter(Boolean),
+            cadence: form.cadence,
+          })
+          .eq("id", id!);
+        if (error) throw error;
+      }
+
+      if (Object.keys(cardScanFields).length) {
+        await writeContactFields(contactId, cardScanFields, "card_scan", 80);
+      }
+      if (Object.keys(userFields).length) {
+        await writeContactFields(contactId, userFields, "user", 100);
+      }
+
       setSaving(false);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Contact added");
-      navigate(`/contact/${data.id}`, { replace: true });
-    } else {
-      const { error } = await supabase.from("contacts").update(payload).eq("id", id!);
+      toast.success(isNew ? "Contact added" : "Saved");
+      navigate(`/contact/${contactId}`, { replace: true });
+    } catch (e) {
       setSaving(false);
-      if (error) { toast.error(error.message); return; }
-      toast.success("Saved");
-      navigate(`/contact/${id}`, { replace: true });
+      toast.error(e instanceof Error ? e.message : "Save failed");
     }
   }
 
