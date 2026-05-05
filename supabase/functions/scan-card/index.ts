@@ -103,15 +103,89 @@ Use empty arrays for none, null for missing single fields. raw_text must contain
     let parsed: any = {};
     try { parsed = JSON.parse(content); } catch { parsed = { raw_text: content }; }
 
+    // Auto-create or merge a contact so the scan never gets lost.
+    const emails: string[] = Array.isArray(parsed.emails)
+      ? parsed.emails.filter((e: any) => typeof e === "string" && e.includes("@"))
+      : [];
+    const phones: string[] = Array.isArray(parsed.phones)
+      ? parsed.phones.filter((p: any) => typeof p === "string" && p.length > 0)
+      : [];
+    const fullName: string =
+      (typeof parsed.full_name === "string" && parsed.full_name.trim()) ||
+      [parsed.first_name, parsed.last_name].filter(Boolean).join(" ").trim() ||
+      (emails[0] ? emails[0].split("@")[0] : "");
+
+    let contactId: string | null = null;
+    if (fullName || emails[0] || phones[0]) {
+      if (emails.length > 0) {
+        const { data: all } = await userClient
+          .from("contacts").select("id, emails").eq("user_id", user.id);
+        const lc = emails.map((e) => e.toLowerCase());
+        const hit = (all ?? []).find((c: any) => {
+          const arr = Array.isArray(c.emails) ? c.emails : [];
+          return arr.some((e: any) => {
+            const v = typeof e === "string" ? e : e?.email;
+            return typeof v === "string" && lc.includes(v.toLowerCase());
+          });
+        });
+        if (hit) contactId = hit.id;
+      }
+      if (!contactId) {
+        const { data: created, error: cErr } = await userClient
+          .from("contacts")
+          .insert({
+            user_id: user.id,
+            full_name: fullName || "(unnamed card)",
+            first_name: parsed.first_name ?? null,
+            last_name: parsed.last_name ?? null,
+            emails, phones,
+            company: parsed.company ?? null,
+            title: parsed.title ?? null,
+            website_url: parsed.website ?? null,
+            linkedin_url: parsed.linkedin ?? null,
+            location: parsed.address ?? null,
+            source: "card_scan",
+          })
+          .select("id").single();
+        if (cErr) console.error("scan-card contact insert", cErr);
+        else contactId = created.id;
+      }
+
+      if (contactId) {
+        const provFields: Record<string, string> = {};
+        const add = (k: string, v: any) => { if (typeof v === "string" && v.trim()) provFields[k] = v.trim(); };
+        add("full_name", fullName);
+        add("first_name", parsed.first_name);
+        add("last_name", parsed.last_name);
+        add("company", parsed.company);
+        add("title", parsed.title);
+        add("location", parsed.address);
+        add("linkedin_url", parsed.linkedin);
+        add("website_url", parsed.website);
+        if (emails[0]) provFields.email = emails[0];
+        if (phones[0]) provFields.phone = phones[0];
+        if (Object.keys(provFields).length > 0) {
+          const { error: rErr } = await userClient.rpc("update_contact_with_provenance", {
+            p_contact_id: contactId,
+            p_fields: provFields,
+            p_source: "card_scan",
+            p_confidence: 80,
+          });
+          if (rErr) console.error("scan-card provenance", rErr);
+        }
+      }
+    }
+
     await userClient.from("card_scans").insert({
       user_id: user.id,
       image_url: paths[0],
+      contact_id: contactId,
       ocr_json: { raw_text: parsed.raw_text ?? "", storage_paths: paths },
       parsed_json: parsed,
       status: "parsed",
     });
 
-    return json({ parsed });
+    return json({ parsed, contact_id: contactId });
   } catch (e) {
     console.error("scan-card error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
