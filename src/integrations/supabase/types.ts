@@ -1159,6 +1159,15 @@ export type Database = {
           pairs_computed: number
         }[]
       }
+      update_contact_with_provenance: {
+        Args: {
+          p_confidence?: number
+          p_contact_id: string
+          p_fields: Json
+          p_source?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       cadence_type: "close" | "monthly" | "quarterly" | "annual" | "none"
