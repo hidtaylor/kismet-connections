@@ -1077,10 +1077,12 @@ export type Database = {
           last_name: string | null
           linkedin_url: string | null
           location: string | null
+          notes_summary: string | null
           organization_id: string | null
           phone: string | null
           phones: Json | null
           photo_url: string | null
+          source: Database["public"]["Enums"]["contact_source"] | null
           title: string | null
           twitter_url: string | null
           updated_at: string | null
@@ -1100,10 +1102,12 @@ export type Database = {
           last_name?: never
           linkedin_url?: never
           location?: never
+          notes_summary?: string | null
           organization_id?: string | null
           phone?: never
           phones?: Json | null
           photo_url?: never
+          source?: Database["public"]["Enums"]["contact_source"] | null
           title?: never
           twitter_url?: never
           updated_at?: string | null
@@ -1123,10 +1127,12 @@ export type Database = {
           last_name?: never
           linkedin_url?: never
           location?: never
+          notes_summary?: string | null
           organization_id?: string | null
           phone?: never
           phones?: Json | null
           photo_url?: never
+          source?: Database["public"]["Enums"]["contact_source"] | null
           title?: never
           twitter_url?: never
           updated_at?: string | null
