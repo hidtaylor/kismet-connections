@@ -34,7 +34,7 @@ export default function ContactDetailPage() {
     queryKey: ["contact", id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("contacts")
+        .from("contacts_resolved")
         .select("*")
         .eq("id", id!)
         .maybeSingle();

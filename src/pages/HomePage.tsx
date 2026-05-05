@@ -19,7 +19,7 @@ export default function HomePage() {
     queryKey: ["contacts", "recent", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("contacts")
+        .from("contacts_resolved")
         .select("id, full_name, company, title, photo_url, last_contact_at, cadence")
         .order("last_contact_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
@@ -34,7 +34,7 @@ export default function HomePage() {
     queryKey: ["contacts", "overdue", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("contacts")
+        .from("contacts_resolved")
         .select("id, full_name, company, title, photo_url, last_contact_at, cadence")
         .neq("cadence", "none")
         .order("last_contact_at", { ascending: true, nullsFirst: true })
