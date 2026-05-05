@@ -338,8 +338,12 @@ export default function ContactDetailPage() {
         )}
       </div>
 
+      {/* Company */}
+      {(contact as any).company_id && <CompanyCard companyId={(contact as any).company_id} />}
+
       {/* Aliases */}
       <AliasList aliases={aliases ?? []} onMakePrimary={handleMakePrimary} />
+
 
       {/* Connections */}
       {connections && connections.length > 0 && (
