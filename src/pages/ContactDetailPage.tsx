@@ -258,17 +258,33 @@ export default function ContactDetailPage() {
             {initials(contact.full_name)}
           </AvatarFallback>
         </Avatar>
-        <h1 className="mt-3 text-2xl font-semibold tracking-tight">{contact.full_name}</h1>
+        <h1 className="mt-3 text-2xl font-semibold tracking-tight">
+          {contact.full_name}
+          {fieldBadge("full_name")}
+        </h1>
         {(contact.title || contact.company) && (
           <p className="mt-0.5 text-sm text-muted-foreground">
             {[contact.title, contact.company].filter(Boolean).join(" · ")}
+            {fieldBadge("title") ?? fieldBadge("company")}
           </p>
         )}
         {contact.location && (
           <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
             <MapPin className="h-3 w-3" /> {contact.location}
+            {fieldBadge("location")}
           </p>
         )}
+        {/* Last enriched */}
+        {lastJob?.created_at && (() => {
+          const ageDays = (Date.now() - new Date(lastJob.created_at).getTime()) / 86400000;
+          const stale = ageDays > 90;
+          return (
+            <p className={`mt-2 text-[10px] uppercase tracking-wider ${stale ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
+              Last enriched {relTime(lastJob.created_at)}
+              {stale && <> · refresh recommended</>}
+            </p>
+          );
+        })()}
       </div>
 
       {/* Quick actions */}
