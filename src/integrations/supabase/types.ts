@@ -118,6 +118,127 @@ export type Database = {
           },
         ]
       }
+      contact_aliases: {
+        Row: {
+          alias_type: string
+          alias_value: string
+          contact_id: string
+          fetched_at: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          alias_type: string
+          alias_value: string
+          contact_id: string
+          fetched_at?: string
+          source: string
+          user_id: string
+        }
+        Update: {
+          alias_type?: string
+          alias_value?: string
+          contact_id?: string
+          fetched_at?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_aliases_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_edges: {
+        Row: {
+          detected_at: string | null
+          edge_type: string
+          evidence: Json
+          from_contact: string
+          strength: number
+          to_contact: string
+          user_id: string
+        }
+        Insert: {
+          detected_at?: string | null
+          edge_type: string
+          evidence: Json
+          from_contact: string
+          strength: number
+          to_contact: string
+          user_id: string
+        }
+        Update: {
+          detected_at?: string | null
+          edge_type?: string
+          evidence?: Json
+          from_contact?: string
+          strength?: number
+          to_contact?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_edges_from_contact_fkey"
+            columns: ["from_contact"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_edges_to_contact_fkey"
+            columns: ["to_contact"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contact_field_sources: {
+        Row: {
+          confidence: number
+          contact_id: string
+          fetched_at: string
+          field_name: string
+          is_active: boolean
+          source: string
+          user_id: string
+          value: string | null
+        }
+        Insert: {
+          confidence: number
+          contact_id: string
+          fetched_at?: string
+          field_name: string
+          is_active?: boolean
+          source: string
+          user_id: string
+          value?: string | null
+        }
+        Update: {
+          confidence?: number
+          contact_id?: string
+          fetched_at?: string
+          field_name?: string
+          is_active?: boolean
+          source?: string
+          user_id?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_field_sources_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_tags: {
         Row: {
           contact_id: string
@@ -260,6 +381,59 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      enrichment_jobs: {
+        Row: {
+          completed_at: string | null
+          contact_id: string
+          cost_cents: number | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          match_key: string
+          provider: string
+          raw_response: Json | null
+          request_hash: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          contact_id: string
+          cost_cents?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          match_key: string
+          provider: string
+          raw_response?: Json | null
+          request_hash: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          contact_id?: string
+          cost_cents?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          match_key?: string
+          provider?: string
+          raw_response?: Json | null
+          request_hash?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrichment_jobs_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       events: {
         Row: {
