@@ -198,24 +198,35 @@ Deno.serve(async (req) => {
       .select("id, emails")
       .eq("user_id", userId);
     const existing = (all ?? []).find((c) => {
-      const arr = (c.emails as Array<{ email?: string }> | null) ?? [];
-      return arr.some((e) => (e?.email ?? "").toLowerCase() === fromEmail);
+      const arr = (c.emails as any[] | null) ?? [];
+      return arr.some((e) => {
+        const v = typeof e === "string" ? e : e?.email;
+        return typeof v === "string" && v.toLowerCase() === fromEmail;
+      });
     });
+
+    // Derive company from sender domain when AI didn't extract one
+    const PERSONAL_DOMAINS = new Set([
+      "gmail.com","googlemail.com","outlook.com","hotmail.com","live.com",
+      "yahoo.com","icloud.com","me.com","mac.com","aol.com","proton.me","protonmail.com","pm.me",
+      "msn.com","comcast.net","sbcglobal.net",
+    ]);
+    const domain = fromEmail.split("@")[1] ?? "";
+    let derivedCompany: string | null = null;
+    if (!extracted.company && domain && !PERSONAL_DOMAINS.has(domain.toLowerCase())) {
+      const root = domain.split(".")[0];
+      derivedCompany = root.charAt(0).toUpperCase() + root.slice(1);
+    }
+    const finalCompany = extracted.company ?? derivedCompany;
 
     let contactId: string;
     let createdNew = false;
 
     if (existing) {
       contactId = existing.id;
-      // Bump last_contact_at
-      await admin
-        .from("contacts")
-        .update({ last_contact_at: occurredAt })
-        .eq("id", contactId);
+      await admin.from("contacts").update({ last_contact_at: occurredAt }).eq("id", contactId);
     } else {
-      const phones = extracted.phone
-        ? [{ label: "work", number: extracted.phone }]
-        : [];
+      const phones = extracted.phone ? [extracted.phone] : [];
       const { data: created, error: cErr } = await admin
         .from("contacts")
         .insert({
@@ -223,9 +234,9 @@ Deno.serve(async (req) => {
           full_name: fullName,
           first_name: extracted.first_name ?? null,
           last_name: extracted.last_name ?? null,
-          company: extracted.company ?? null,
+          company: finalCompany,
           title: extracted.title ?? null,
-          emails: [{ label: "work", email: fromEmail }],
+          emails: [fromEmail],
           phones,
           linkedin_url: extracted.linkedin_url ?? null,
           twitter_url: extracted.twitter_url ?? null,
@@ -239,6 +250,30 @@ Deno.serve(async (req) => {
       if (cErr) throw cErr;
       contactId = created.id;
       createdNew = true;
+    }
+
+    // Provenance for tracked fields (source: email)
+    {
+      const provFields: Record<string, string> = {};
+      const add = (k: string, v: any) => { if (typeof v === "string" && v.trim()) provFields[k] = v.trim(); };
+      add("full_name", fullName);
+      add("first_name", extracted.first_name);
+      add("last_name", extracted.last_name);
+      add("company", finalCompany);
+      add("title", extracted.title);
+      add("location", extracted.location);
+      add("linkedin_url", extracted.linkedin_url);
+      add("twitter_url", extracted.twitter_url);
+      add("website_url", extracted.website_url);
+      provFields.email = fromEmail;
+      if (extracted.phone) provFields.phone = extracted.phone;
+      const { error: rErr } = await admin.rpc("update_contact_with_provenance", {
+        p_contact_id: contactId,
+        p_fields: provFields,
+        p_source: "email",
+        p_confidence: 70,
+      });
+      if (rErr) console.error("gmail-import provenance", rErr);
     }
 
     // Create interaction
