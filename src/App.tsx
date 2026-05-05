@@ -68,6 +68,7 @@ const App = () => (
               <Route path="/import/calendar" element={<CalendarReviewPage />} />
               <Route path="/import/gmail" element={<GmailImportPage />} />
               <Route path="/inbox/memories" element={<MemoryInboxPage />} />
+              <Route path="/triggers" element={<TriggersPage />} />
               <Route path="/organizations" element={<OrganizationsPage />} />
               <Route path="/organizations/new" element={<OrganizationEditPage />} />
               <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
