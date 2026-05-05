@@ -310,6 +310,29 @@ Deno.serve(async (req) => {
       await admin.rpc("recompute_field_activation", { p_contact_id: contactId, p_field_name: f });
     }
 
+    // ---------- Diff company/title for job-change events ----------
+    if (pdlStatus === "success") {
+      const { data: afterRow } = await admin
+        .from("contacts_resolved")
+        .select("company, title")
+        .eq("id", contactId)
+        .maybeSingle();
+      const afterCompany = afterRow?.company ?? null;
+      const afterTitle = afterRow?.title ?? null;
+      const events: any[] = [];
+      const norm = (s: any) => (s ? String(s).trim().toLowerCase() : "");
+      const companyChanged = beforeCompany && afterCompany && norm(beforeCompany) !== norm(afterCompany);
+      const titleChanged = beforeTitle && afterTitle && norm(beforeTitle) !== norm(afterTitle);
+      if (companyChanged && titleChanged) {
+        events.push({ user_id: userId, contact_id: contactId, event_type: "job_change", before_value: `${beforeTitle} @ ${beforeCompany}`, after_value: `${afterTitle} @ ${afterCompany}` });
+      } else if (companyChanged) {
+        events.push({ user_id: userId, contact_id: contactId, event_type: "company_change", before_value: beforeCompany, after_value: afterCompany });
+      } else if (titleChanged) {
+        events.push({ user_id: userId, contact_id: contactId, event_type: "title_change", before_value: beforeTitle, after_value: afterTitle });
+      }
+      if (events.length) await admin.from("contact_events").insert(events);
+    }
+
     return new Response(JSON.stringify({
       job_id: job?.id ?? null,
       status: pdlStatus,
