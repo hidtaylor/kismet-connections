@@ -125,6 +125,150 @@ export type Database = {
           },
         ]
       }
+      companies: {
+        Row: {
+          created_at: string
+          domain: string | null
+          id: string
+          last_polled_at: string | null
+          name: string
+          news_feed_url: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          domain?: string | null
+          id?: string
+          last_polled_at?: string | null
+          name: string
+          news_feed_url?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          domain?: string | null
+          id?: string
+          last_polled_at?: string | null
+          name?: string
+          news_feed_url?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      company_events: {
+        Row: {
+          acted_on_at: string | null
+          after_value: string | null
+          before_value: string | null
+          company_id: string
+          detected_at: string
+          dismissed_at: string | null
+          event_type: string
+          id: string
+          source_label: string | null
+          title: string | null
+          url: string | null
+          url_normalized: string | null
+          user_id: string
+        }
+        Insert: {
+          acted_on_at?: string | null
+          after_value?: string | null
+          before_value?: string | null
+          company_id: string
+          detected_at?: string
+          dismissed_at?: string | null
+          event_type: string
+          id?: string
+          source_label?: string | null
+          title?: string | null
+          url?: string | null
+          url_normalized?: string | null
+          user_id: string
+        }
+        Update: {
+          acted_on_at?: string | null
+          after_value?: string | null
+          before_value?: string | null
+          company_id?: string
+          detected_at?: string
+          dismissed_at?: string | null
+          event_type?: string
+          id?: string
+          source_label?: string | null
+          title?: string | null
+          url?: string | null
+          url_normalized?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_resolved"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_field_sources: {
+        Row: {
+          company_id: string
+          confidence: number
+          fetched_at: string
+          field_name: string
+          is_active: boolean
+          source: string
+          user_id: string
+          value: string | null
+        }
+        Insert: {
+          company_id: string
+          confidence: number
+          fetched_at?: string
+          field_name: string
+          is_active?: boolean
+          source: string
+          user_id: string
+          value?: string | null
+        }
+        Update: {
+          company_id?: string
+          confidence?: number
+          fetched_at?: string
+          field_name?: string
+          is_active?: boolean
+          source?: string
+          user_id?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_field_sources_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_field_sources_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_resolved"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contact_aliases: {
         Row: {
           alias_type: string
@@ -369,6 +513,7 @@ export type Database = {
         Row: {
           cadence: Database["public"]["Enums"]["cadence_type"]
           company: string | null
+          company_id: string | null
           created_at: string
           emails: Json
           first_name: string | null
@@ -392,6 +537,7 @@ export type Database = {
         Insert: {
           cadence?: Database["public"]["Enums"]["cadence_type"]
           company?: string | null
+          company_id?: string | null
           created_at?: string
           emails?: Json
           first_name?: string | null
@@ -415,6 +561,7 @@ export type Database = {
         Update: {
           cadence?: Database["public"]["Enums"]["cadence_type"]
           company?: string | null
+          company_id?: string | null
           created_at?: string
           emails?: Json
           first_name?: string | null
@@ -436,6 +583,20 @@ export type Database = {
           website_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_resolved"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "contacts_organization_id_fkey"
             columns: ["organization_id"]
@@ -477,8 +638,9 @@ export type Database = {
       }
       enrichment_jobs: {
         Row: {
+          company_id: string | null
           completed_at: string | null
-          contact_id: string
+          contact_id: string | null
           cost_cents: number | null
           created_at: string | null
           error_message: string | null
@@ -491,8 +653,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          company_id?: string | null
           completed_at?: string | null
-          contact_id: string
+          contact_id?: string | null
           cost_cents?: number | null
           created_at?: string | null
           error_message?: string | null
@@ -505,8 +668,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          company_id?: string | null
           completed_at?: string | null
-          contact_id?: string
+          contact_id?: string | null
           cost_cents?: number | null
           created_at?: string | null
           error_message?: string | null
@@ -519,6 +683,20 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "enrichment_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrichment_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies_resolved"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "enrichment_jobs_contact_id_fkey"
             columns: ["contact_id"]
@@ -1114,6 +1292,57 @@ export type Database = {
       }
     }
     Views: {
+      companies_resolved: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          domain: string | null
+          employee_count: string | null
+          funding_stage: string | null
+          id: string | null
+          industry: string | null
+          last_funding_amount: string | null
+          last_polled_at: string | null
+          location: string | null
+          name: string | null
+          news_feed_url: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: never
+          domain?: string | null
+          employee_count?: never
+          funding_stage?: never
+          id?: string | null
+          industry?: never
+          last_funding_amount?: never
+          last_polled_at?: string | null
+          location?: never
+          name?: string | null
+          news_feed_url?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: never
+          domain?: string | null
+          employee_count?: never
+          funding_stage?: never
+          id?: string | null
+          industry?: never
+          last_funding_amount?: never
+          last_polled_at?: string | null
+          location?: never
+          name?: string | null
+          news_feed_url?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       contacts_resolved: {
         Row: {
           cadence: Database["public"]["Enums"]["cadence_type"] | null
@@ -1202,9 +1431,17 @@ export type Database = {
       }
     }
     Functions: {
+      get_active_company_value: {
+        Args: { p_company_id: string; p_field_name: string }
+        Returns: string
+      }
       get_active_contact_value: {
         Args: { p_contact_id: string; p_field_name: string }
         Returns: string
+      }
+      recompute_company_field_activation: {
+        Args: { p_company_id: string; p_field_name: string }
+        Returns: undefined
       }
       recompute_field_activation: {
         Args: { p_contact_id: string; p_field_name: string }
