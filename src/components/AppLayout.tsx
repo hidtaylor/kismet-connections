@@ -27,13 +27,13 @@ export function AppLayout() {
   });
 
   const { data: triggerCount } = useQuery({
-    queryKey: ["contact-events-count"],
+    queryKey: ["triggers-count"],
     queryFn: async () => {
-      const { count } = await supabase
-        .from("contact_events")
-        .select("id", { count: "exact", head: true })
-        .is("dismissed_at", null);
-      return count ?? 0;
+      const [a, b] = await Promise.all([
+        supabase.from("contact_events").select("id", { count: "exact", head: true }).is("dismissed_at", null),
+        supabase.from("company_events").select("id", { count: "exact", head: true }).is("dismissed_at", null),
+      ]);
+      return (a.count ?? 0) + (b.count ?? 0);
     },
     enabled: !!user,
     refetchInterval: 60_000,

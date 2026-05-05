@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { EnrichmentBadge } from "@/components/EnrichmentBadge";
 import { AliasList, type Alias } from "@/components/AliasList";
+import { CompanyCard } from "@/components/CompanyCard";
 
 const interactionIcon: Record<string, typeof Users> = {
   in_person: Users,
@@ -337,8 +338,12 @@ export default function ContactDetailPage() {
         )}
       </div>
 
+      {/* Company */}
+      {(contact as any).company_id && <CompanyCard companyId={(contact as any).company_id} />}
+
       {/* Aliases */}
       <AliasList aliases={aliases ?? []} onMakePrimary={handleMakePrimary} />
+
 
       {/* Connections */}
       {connections && connections.length > 0 && (
