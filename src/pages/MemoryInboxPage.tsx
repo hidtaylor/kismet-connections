@@ -20,7 +20,7 @@ type SuggestionRow = {
   contacts: { id: string; full_name: string } | null;
 };
 
-export default function MemoryInboxPage() {
+export default function MemoryInboxPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const qc = useQueryClient();
@@ -82,15 +82,17 @@ export default function MemoryInboxPage() {
 
   return (
     <div className="mx-auto w-full max-w-md">
-      <header
-        className="sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-background/85 px-2 py-2 backdrop-blur-md"
-        style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.25rem)" }}
-      >
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-sm font-medium">Suggested memories</h1>
-      </header>
+      {!embedded && (
+        <header
+          className="sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-background/85 px-2 py-2 backdrop-blur-md"
+          style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.25rem)" }}
+        >
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-sm font-medium">Suggested memories</h1>
+        </header>
+      )}
 
       <div className="px-4 py-4">
         {isLoading ? (
