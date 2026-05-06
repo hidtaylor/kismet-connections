@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { ContactRow } from "@/components/ContactRow";
 import { EmptyState, SectionHeader, RowSkeleton } from "@/components/EmptyState";
-import { Search, Users, Sparkles, Calendar, Mail, ChevronRight } from "lucide-react";
+import { Search, Users, Sparkles, Calendar } from "lucide-react";
 import { KismetMark } from "@/components/KismetMark";
 
 const CAL_SYNC_KEY = "kismet:lastCalSync";
@@ -121,50 +121,31 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Inbox: import sources */}
-      <section>
-        <SectionHeader>Inbox</SectionHeader>
-        <div className="bg-card hairline border-y divide-y divide-border">
-          <Link
-            to="/import/calendar"
-            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/40"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Calendar className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Calendar review</p>
-              <p className="text-xs text-muted-foreground">
-                {pendingCount === undefined
-                  ? "Checking…"
-                  : pendingCount === 0
-                  ? "All caught up"
-                  : `${pendingCount} event${pendingCount === 1 ? "" : "s"} waiting`}
-              </p>
-            </div>
-            {pendingCount && pendingCount > 0 ? (
+      {/* Pending calendar (only when there's something) */}
+      {pendingCount && pendingCount > 0 ? (
+        <section>
+          <SectionHeader>Inbox</SectionHeader>
+          <div className="bg-card hairline border-y">
+            <Link
+              to="/import/calendar"
+              className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/40"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Calendar className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Calendar review</p>
+                <p className="text-xs text-muted-foreground">
+                  {pendingCount} event{pendingCount === 1 ? "" : "s"} waiting
+                </p>
+              </div>
               <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
                 {pendingCount}
               </span>
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )}
-          </Link>
-          <Link
-            to="/import/gmail"
-            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/40"
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Mail className="h-4 w-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Import from Gmail</p>
-              <p className="text-xs text-muted-foreground">Push a sender to your CRM</p>
-            </div>
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          </Link>
-        </div>
-      </section>
+            </Link>
+          </div>
+        </section>
+      ) : null}
 
       {/* Needs attention */}
       {overdue && overdue.length > 0 && (
