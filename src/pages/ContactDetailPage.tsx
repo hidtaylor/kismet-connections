@@ -477,13 +477,13 @@ export default function ContactDetailPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
-                        <p className="truncate text-sm font-medium">{item.data.title}</p>
+                        <p className="text-sm font-medium break-words">{item.data.title}</p>
                         <span className="shrink-0 text-[11px] text-muted-foreground">
                           {relTime(item.ts)}
                         </span>
                       </div>
                       {item.data.summary && (
-                        <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">
+                        <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">
                           {item.data.summary}
                         </p>
                       )}
