@@ -48,14 +48,14 @@ export async function writeContactFields(
         p_email: email,
       });
       const row = Array.isArray(linked) ? linked[0] : linked;
-      const patch: Record<string, string> = {};
+      const patch: { organization_id?: string; company_id?: string } = {};
       if (row?.organization_id && row.organization_id !== contact?.organization_id) {
         patch.organization_id = row.organization_id;
       }
       if (row?.company_id && row.company_id !== contact?.company_id) {
         patch.company_id = row.company_id;
       }
-      if (Object.keys(patch).length > 0) {
+      if (patch.organization_id || patch.company_id) {
         await supabase.from("contacts").update(patch).eq("id", contactId);
       }
     } catch {
