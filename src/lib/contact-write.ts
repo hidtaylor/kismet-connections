@@ -2,66 +2,12 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type ContactWriteSource = "user" | "card_scan";
 
-const PERSONAL_DOMAINS = new Set([
-  "gmail.com", "outlook.com", "hotmail.com", "yahoo.com",
-  "icloud.com", "me.com", "live.com", "aol.com", "proton.me", "protonmail.com",
-]);
-
-function normalizeCompanyName(name: string): string {
-  return name
-    .replace(/[,.]/g, " ")
-    .replace(/\b(inc|incorporated|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|gmbh|sa|ag|plc|pty)\b\.?/gi, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function domainFromEmail(email: string): string | null {
-  const m = email.toLowerCase().match(/@([^>\s]+)$/);
-  if (!m) return null;
-  const d = m[1].trim();
-  return PERSONAL_DOMAINS.has(d) ? null : d;
-}
-
-/** Find or create the user's company row. Prefer domain match; fall back to normalized name. */
-async function resolveCompanyId(
-  userId: string,
-  companyName: string | null | undefined,
-  email: string | null | undefined,
-): Promise<string | null> {
-  const domain = email ? domainFromEmail(email) : null;
-  const trimmedName = companyName?.trim() || null;
-  if (!domain && !trimmedName) return null;
-
-  if (domain) {
-    const { data: existing } = await supabase
-      .from("companies").select("id").eq("user_id", userId).eq("domain", domain).maybeSingle();
-    if (existing) return existing.id;
-    // Insert by domain (use company name if provided, else domain root)
-    const name = trimmedName ?? domain.replace(/^www\./, "").split(".")[0];
-    const { data, error } = await supabase
-      .from("companies").insert({ user_id: userId, name, domain })
-      .select("id").maybeSingle();
-    if (!error && data) return data.id;
-  }
-
-  if (trimmedName) {
-    const norm = normalizeCompanyName(trimmedName).toLowerCase();
-    if (!norm) return null;
-    const { data: list } = await supabase
-      .from("companies").select("id, name").eq("user_id", userId);
-    const hit = (list ?? []).find((c) => normalizeCompanyName(c.name).toLowerCase() === norm);
-    if (hit) return hit.id;
-    const { data } = await supabase
-      .from("companies").insert({ user_id: userId, name: trimmedName })
-      .select("id").maybeSingle();
-    return data?.id ?? null;
-  }
-  return null;
-}
-
 /**
  * Write contact fields through the provenance RPC.
- * Also links contact to a company row (matched by corporate email domain or normalized name).
+ * Also links contact to matching organization + company rows (via the
+ * `ensure_org_and_company` RPC, matched by corporate email domain or
+ * normalized name). The DB trigger covers most cases, but we also call it
+ * here so the linkage is immediate even when only field-source rows change.
  */
 export async function writeContactFields(
   contactId: string,
