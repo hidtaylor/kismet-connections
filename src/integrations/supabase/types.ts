@@ -1018,6 +1018,7 @@ export type Database = {
       organizations: {
         Row: {
           created_at: string
+          domain: string | null
           id: string
           kind: Database["public"]["Enums"]["org_kind"]
           logo_url: string | null
@@ -1030,6 +1031,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          domain?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["org_kind"]
           logo_url?: string | null
@@ -1042,6 +1044,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          domain?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["org_kind"]
           logo_url?: string | null
@@ -1448,6 +1451,14 @@ export type Database = {
       }
     }
     Functions: {
+      domain_from_email: { Args: { p_email: string }; Returns: string }
+      ensure_org_and_company: {
+        Args: { p_email?: string; p_name: string; p_user_id: string }
+        Returns: {
+          company_id: string
+          organization_id: string
+        }[]
+      }
       get_active_company_value: {
         Args: { p_company_id: string; p_field_name: string }
         Returns: string
@@ -1456,6 +1467,7 @@ export type Database = {
         Args: { p_contact_id: string; p_field_name: string }
         Returns: string
       }
+      normalize_company_name: { Args: { p_name: string }; Returns: string }
       recompute_company_field_activation: {
         Args: { p_company_id: string; p_field_name: string }
         Returns: undefined
