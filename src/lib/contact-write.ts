@@ -29,21 +29,34 @@ export async function writeContactFields(
   });
   if (error) throw error;
 
-  // Link to a company if we touched company or email
+  // Link to organization + company if we touched company or email
   if (clean.company || clean.email) {
     try {
       const { data: u } = await supabase.auth.getUser();
       const userId = u.user?.id;
       if (!userId) return;
       const { data: contact } = await supabase
-        .from("contacts").select("emails, company, company_id")
+        .from("contacts").select("emails, company, company_id, organization_id")
         .eq("id", contactId).maybeSingle();
       const emails = (contact?.emails as any[]) ?? [];
       const email = clean.email ?? emails[0] ?? null;
       const companyName = clean.company ?? contact?.company ?? null;
-      const companyId = await resolveCompanyId(userId, companyName, email);
-      if (companyId && companyId !== contact?.company_id) {
-        await supabase.from("contacts").update({ company_id: companyId }).eq("id", contactId);
+      if (!companyName && !email) return;
+      const { data: linked } = await supabase.rpc("ensure_org_and_company", {
+        p_user_id: userId,
+        p_name: companyName,
+        p_email: email,
+      });
+      const row = Array.isArray(linked) ? linked[0] : linked;
+      const patch: Record<string, string> = {};
+      if (row?.organization_id && row.organization_id !== contact?.organization_id) {
+        patch.organization_id = row.organization_id;
+      }
+      if (row?.company_id && row.company_id !== contact?.company_id) {
+        patch.company_id = row.company_id;
+      }
+      if (Object.keys(patch).length > 0) {
+        await supabase.from("contacts").update(patch).eq("id", contactId);
       }
     } catch {
       // best-effort linkage
