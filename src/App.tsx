@@ -21,6 +21,8 @@ import OrganizationsPage from "./pages/OrganizationsPage";
 import OrganizationEditPage from "./pages/OrganizationEditPage";
 import OrganizationDetailPage from "./pages/OrganizationDetailPage";
 import TriggersPage from "./pages/TriggersPage";
+import ContactsPage from "./pages/ContactsPage";
+import InboxPage from "./pages/InboxPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -67,12 +69,18 @@ const App = () => (
               <Route path="/capture/meeting" element={<RecordMeetingPage />} />
               <Route path="/import/calendar" element={<CalendarReviewPage />} />
               <Route path="/import/gmail" element={<GmailImportPage />} />
-              <Route path="/inbox/memories" element={<MemoryInboxPage />} />
-              <Route path="/triggers" element={<TriggersPage />} />
-              <Route path="/organizations" element={<OrganizationsPage />} />
+              <Route path="/inbox" element={<InboxPage />} />
+              <Route path="/inbox/memories" element={<Navigate to="/inbox?tab=memories" replace />} />
+              <Route path="/triggers" element={<Navigate to="/inbox?tab=triggers" replace />} />
+              <Route path="/contacts" element={<ContactsPage />} />
+              <Route path="/organizations" element={<Navigate to="/contacts?tab=companies" replace />} />
               <Route path="/organizations/new" element={<OrganizationEditPage />} />
               <Route path="/organizations/:id" element={<OrganizationDetailPage />} />
               <Route path="/organizations/:id/edit" element={<OrganizationEditPage />} />
+              {/* Legacy aliases */}
+              <Route path="/_triggers" element={<TriggersPage />} />
+              <Route path="/_memories" element={<MemoryInboxPage />} />
+              <Route path="/_organizations" element={<OrganizationsPage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
