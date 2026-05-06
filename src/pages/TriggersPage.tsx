@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 
 type Filter = "all" | "people" | "companies";
 
-export default function TriggersPage() {
+export default function TriggersPage({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
@@ -86,24 +86,26 @@ export default function TriggersPage() {
 
   return (
     <div className="mx-auto w-full max-w-md">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-md"
-              style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)" }}>
-        <h1 className="text-xl font-semibold tracking-tight">Triggers</h1>
-        <p className="text-xs text-muted-foreground">Reasons to reach out</p>
-        <div className="mt-3 flex gap-1.5">
-          {(["all", "people", "companies"] as Filter[]).map((f) => (
-            <button key={f} onClick={() => setFilter(f)}
-                    className={cn(
-                      "rounded-full border px-3 py-1 text-xs capitalize transition-colors",
-                      filter === f
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border bg-card text-muted-foreground hover:text-foreground"
-                    )}>
-              {f}
-            </button>
-          ))}
-        </div>
-      </header>
+      {!embedded && (
+        <header className="sticky top-0 z-30 border-b border-border bg-background/85 px-4 py-3 backdrop-blur-md"
+                style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)" }}>
+          <h1 className="text-xl font-semibold tracking-tight">Triggers</h1>
+          <p className="text-xs text-muted-foreground">Reasons to reach out</p>
+        </header>
+      )}
+      <div className={cn("flex gap-1.5 px-4", embedded ? "py-3" : "border-b border-border bg-background/85 py-3")}>
+        {(["all", "people", "companies"] as Filter[]).map((f) => (
+          <button key={f} onClick={() => setFilter(f)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs capitalize transition-colors",
+                    filter === f
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:text-foreground"
+                  )}>
+            {f}
+          </button>
+        ))}
+      </div>
 
       {isLoading ? (
         <div className="p-6 text-sm text-muted-foreground">Loading…</div>

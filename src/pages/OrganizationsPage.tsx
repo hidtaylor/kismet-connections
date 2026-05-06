@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Building2, Plus, ChevronRight, Search } from "lucide-react";
 import { EmptyState, RowSkeleton } from "@/components/EmptyState";
 
-export default function OrganizationsPage() {
+export default function OrganizationsPage({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
@@ -41,22 +41,24 @@ export default function OrganizationsPage() {
 
   return (
     <div className="mx-auto w-full max-w-md">
-      <header
-        className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/85 px-2 py-2 backdrop-blur-md"
-        style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.25rem)" }}
-      >
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <h1 className="text-sm font-medium">Organizations</h1>
-        <Button
-          size="sm"
-          onClick={() => navigate("/organizations/new")}
-          className="bg-gradient-kismet text-primary-foreground hover:opacity-90"
+      {!embedded && (
+        <header
+          className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/85 px-2 py-2 backdrop-blur-md"
+          style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.25rem)" }}
         >
-          <Plus className="mr-1 h-3.5 w-3.5" /> New
-        </Button>
-      </header>
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="Back">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-sm font-medium">Organizations</h1>
+          <Button
+            size="sm"
+            onClick={() => navigate("/organizations/new")}
+            className="bg-gradient-kismet text-primary-foreground hover:opacity-90"
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" /> New
+          </Button>
+        </header>
+      )}
 
       <div className="px-3 py-3">
         <div className="relative">
