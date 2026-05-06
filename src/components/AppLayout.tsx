@@ -1,69 +1,57 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, Settings, Plus, ScanLine, Mic, UserPlus, Radio, X, Sparkles, Bell } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Home, Users, Settings, Plus, ScanLine, Mic, UserPlus, Radio, Inbox, Calendar, Mail, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 
 export function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [fabOpen, setFabOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
-  const { data: pendingMemories } = useQuery({
-    queryKey: ["pending-memory-count"],
+  const { data: inboxCount } = useQuery({
+    queryKey: ["inbox-count"],
     queryFn: async () => {
-      const { count } = await supabase
-        .from("suggested_memories")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "pending");
-      return count ?? 0;
-    },
-    enabled: !!user,
-    refetchInterval: 60_000,
-  });
-
-  const { data: triggerCount } = useQuery({
-    queryKey: ["triggers-count"],
-    queryFn: async () => {
-      const [a, b] = await Promise.all([
+      const [m, c, co] = await Promise.all([
+        supabase.from("suggested_memories").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("contact_events").select("id", { count: "exact", head: true }).is("dismissed_at", null),
         supabase.from("company_events").select("id", { count: "exact", head: true }).is("dismissed_at", null),
       ]);
-      return (a.count ?? 0) + (b.count ?? 0);
+      return (m.count ?? 0) + (c.count ?? 0) + (co.count ?? 0);
     },
     enabled: !!user,
     refetchInterval: 60_000,
   });
 
-  // Close FAB on route change
-  useEffect(() => { setFabOpen(false); }, [location.pathname]);
-
-  // Close FAB on Escape
-  useEffect(() => {
-    if (!fabOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setFabOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [fabOpen]);
-
-  const tabs: Array<{ to: string; icon: typeof Home; label: string; badge?: number }> = [
-    { to: "/", icon: Home, label: "Home" },
-    { to: "/search", icon: Search, label: "Search" },
-    { to: "/triggers", icon: Bell, label: "Triggers", badge: triggerCount ?? 0 },
-    { to: "/inbox/memories", icon: Sparkles, label: "Memories", badge: pendingMemories ?? 0 },
-    { to: "/settings", icon: Settings, label: "Settings" },
+  type Tab = { to: string; icon: typeof Home; label: string; badge?: number; match: (p: string) => boolean };
+  const tabs: Tab[] = [
+    { to: "/", icon: Home, label: "Home", match: (p) => p === "/" },
+    { to: "/contacts", icon: Users, label: "Contacts", match: (p) => p.startsWith("/contacts") || p.startsWith("/contact/") || p.startsWith("/organizations") },
+    { to: "/inbox", icon: Inbox, label: "Inbox", badge: inboxCount ?? 0, match: (p) => p.startsWith("/inbox") || p.startsWith("/triggers") },
+    { to: "/settings", icon: Settings, label: "Settings", match: (p) => p.startsWith("/settings") },
   ];
 
-  const fabActions: Array<{ to: string; icon: typeof Plus; label: string; rx: string; ry: string }> = [
-    { to: "/capture/scan", icon: ScanLine, label: "Scan card", rx: "-90px", ry: "-20px" },
-    { to: "/capture/voice", icon: Mic, label: "Voice note", rx: "-60px", ry: "-80px" },
-    { to: "/contact/new", icon: UserPlus, label: "Add contact", rx: "10px", ry: "-100px" },
-    { to: "/capture/meeting", icon: Radio, label: "Record meeting", rx: "70px", ry: "-60px" },
+  type Action = { to: string; icon: typeof Plus; label: string; hint?: string };
+  const primaryActions: Action[] = [
+    { to: "/contact/new", icon: UserPlus, label: "Add contact", hint: "Enter details manually" },
+    { to: "/capture/scan", icon: ScanLine, label: "Scan business card", hint: "Capture with the camera" },
+    { to: "/capture/voice", icon: Mic, label: "Voice note", hint: "Record a quick thought" },
+    { to: "/capture/meeting", icon: Radio, label: "Record meeting", hint: "Live transcribe a conversation" },
   ];
+  const importActions: Action[] = [
+    { to: "/import/calendar", icon: Calendar, label: "Import from calendar", hint: "Review recent events" },
+    { to: "/import/gmail", icon: Mail, label: "Import from Gmail", hint: "Push a sender to your CRM" },
+  ];
+
+  const go = (to: string) => {
+    setSheetOpen(false);
+    navigate(to);
+  };
 
   return (
     <div className="relative flex h-full min-h-screen flex-col bg-background">
@@ -71,102 +59,119 @@ export function AppLayout() {
         <Outlet />
       </main>
 
-      {/* Bottom nav */}
+      {/* Bottom nav with center [+] */}
       <nav
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/85 backdrop-blur-md"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="mx-auto flex max-w-md items-center justify-around px-2 py-1.5">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const active =
-              t.to === "/" ? location.pathname === "/" : location.pathname.startsWith(t.to);
-            return (
-              <button
-                key={t.to}
-                onClick={() => navigate(t.to)}
-                className={cn(
-                  "relative flex flex-col items-center gap-0.5 rounded-md px-3 py-1.5 transition-colors",
-                  active ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                )}
-                aria-label={t.label}
-              >
-                <Icon className="h-5 w-5" />
-                {t.badge && t.badge > 0 ? (
-                  <span className="absolute right-1 top-0.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-gradient-kismet px-1 text-[9px] font-semibold text-primary-foreground">
-                    {t.badge > 99 ? "99+" : t.badge}
-                  </span>
-                ) : null}
-                <span className="text-[10px] font-medium">{t.label}</span>
-              </button>
-            );
-          })}
+        <div className="mx-auto grid max-w-md grid-cols-5 items-end px-2 pb-1.5 pt-1">
+          {/* Left tabs */}
+          {tabs.slice(0, 2).map((t) => (
+            <TabButton key={t.to} tab={t} active={t.match(location.pathname)} onClick={() => navigate(t.to)} />
+          ))}
+
+          {/* Center [+] */}
+          <div className="flex items-center justify-center">
+            <button
+              onClick={() => setSheetOpen(true)}
+              aria-label="New entry"
+              className="-mt-5 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-kismet text-primary-foreground fab-shadow transition-transform active:scale-95"
+            >
+              <Plus className="h-6 w-6" />
+            </button>
+          </div>
+
+          {/* Right tabs */}
+          {tabs.slice(2).map((t) => (
+            <TabButton key={t.to} tab={t} active={t.match(location.pathname)} onClick={() => navigate(t.to)} />
+          ))}
         </div>
       </nav>
 
-      {/* FAB + radial menu */}
-      <div className="pointer-events-none fixed inset-0 z-50">
-        {/* Backdrop */}
-        <div
-          onClick={() => setFabOpen(false)}
-          className={cn(
-            "absolute inset-0 bg-background/60 backdrop-blur-sm transition-opacity",
-            fabOpen ? "pointer-events-auto opacity-100" : "opacity-0"
-          )}
-        />
-
-        {/* Radial actions */}
-        <div
-          className="absolute"
-          style={{ right: "1.5rem", bottom: `calc(env(safe-area-inset-bottom) + 5.5rem)` }}
+      {/* Action sheet */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl border-t bg-card p-0"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
-          {fabActions.map((a, i) => {
-            const Icon = a.icon;
-            return (
-              <button
-                key={a.to}
-                onClick={() => navigate(a.to)}
-                className={cn(
-                  "absolute right-0 bottom-0 flex h-12 w-12 items-center justify-center rounded-full bg-card text-foreground elevation-2 transition-all hairline border",
-                  fabOpen
-                    ? "pointer-events-auto opacity-100"
-                    : "pointer-events-none translate-x-0 translate-y-0 opacity-0 scale-50"
-                )}
-                style={
-                  fabOpen
-                    ? ({
-                        transform: `translate(${a.rx}, ${a.ry})`,
-                        transitionDelay: `${i * 35}ms`,
-                        transitionDuration: "220ms",
-                      } as React.CSSProperties)
-                    : undefined
-                }
-                aria-label={a.label}
-                title={a.label}
-              >
-                <Icon className="h-5 w-5" />
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Main FAB */}
-        <button
-          onClick={() => setFabOpen((v) => !v)}
-          className="pointer-events-auto absolute flex h-14 w-14 items-center justify-center rounded-full bg-gradient-kismet text-primary-foreground fab-shadow transition-transform"
-          style={{
-            right: "1.5rem",
-            bottom: `calc(env(safe-area-inset-bottom) + 5rem)`,
-            transform: fabOpen ? "rotate(45deg)" : "rotate(0deg)",
-          }}
-          aria-label={fabOpen ? "Close menu" : "New entry"}
-        >
-          {fabOpen ? <X className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
-        </button>
-      </div>
-
+          <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-muted-foreground/30" />
+          <div className="px-4 pb-2 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Capture
+          </div>
+          <div className="bg-card hairline border-y divide-y divide-border">
+            {primaryActions.map((a) => (
+              <ActionRow key={a.to} action={a} onClick={() => go(a.to)} />
+            ))}
+          </div>
+          <div className="px-4 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Import
+          </div>
+          <div className="bg-card hairline border-y divide-y divide-border">
+            {importActions.map((a) => (
+              <ActionRow key={a.to} action={a} onClick={() => go(a.to)} />
+            ))}
+          </div>
+          <div className="h-3" />
+        </SheetContent>
+      </Sheet>
 
       <InstallPrompt />
     </div>
+  );
+}
+
+function TabButton({
+  tab,
+  active,
+  onClick,
+}: {
+  tab: { icon: typeof Home; label: string; badge?: number };
+  active: boolean;
+  onClick: () => void;
+}) {
+  const Icon = tab.icon;
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "relative flex flex-col items-center gap-0.5 rounded-md px-2 py-1.5 transition-colors",
+        active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+      )}
+      aria-label={tab.label}
+    >
+      <Icon className="h-5 w-5" />
+      {tab.badge && tab.badge > 0 ? (
+        <span className="absolute right-1 top-0 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-gradient-kismet px-1 text-[9px] font-semibold text-primary-foreground">
+          {tab.badge > 99 ? "99+" : tab.badge}
+        </span>
+      ) : null}
+      <span className="text-[10px] font-medium">{tab.label}</span>
+    </button>
+  );
+}
+
+function ActionRow({
+  action,
+  onClick,
+}: {
+  action: { icon: typeof Plus; label: string; hint?: string };
+  onClick: () => void;
+}) {
+  const Icon = action.icon;
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/40 active:bg-accent/60"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">{action.label}</p>
+        {action.hint && <p className="text-xs text-muted-foreground">{action.hint}</p>}
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    </button>
   );
 }
